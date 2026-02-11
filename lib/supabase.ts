@@ -3,10 +3,16 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// 只在环境变量配置时创建客户端
+export const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
+
+// 检查 Supabase 是否已配置
+export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
 
 // 类型定义
 export interface StrategyRow {
@@ -31,12 +37,14 @@ export interface UserProfile {
 export const authHelpers = {
   // 获取当前用户
   async getCurrentUser() {
+    if (!supabase) return null;
     const { data: { user } } = await supabase.auth.getUser();
     return user;
   },
 
   // 邮箱登录
   async signInWithEmail(email: string, password: string) {
+    if (!supabase) return { data: null, error: new Error('Supabase not configured') };
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -46,6 +54,7 @@ export const authHelpers = {
 
   // 邮箱注册
   async signUpWithEmail(email: string, password: string) {
+    if (!supabase) return { data: null, error: new Error('Supabase not configured') };
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -55,12 +64,14 @@ export const authHelpers = {
 
   // 登出
   async signOut() {
+    if (!supabase) return { error: new Error('Supabase not configured') };
     const { error } = await supabase.auth.signOut();
     return { error };
   },
 
   // 监听认证状态变化
   onAuthStateChange(callback: (event: string, session: any) => void) {
+    if (!supabase) return { data: { subscription: null } };
     return supabase.auth.onAuthStateChange(callback);
   }
 };
@@ -69,6 +80,7 @@ export const authHelpers = {
 export const dbHelpers = {
   // 获取用户的策略数据
   async getUserStrategies() {
+    if (!supabase) return { data: null, error: new Error('Supabase not configured') };
     const { data, error } = await supabase
       .from('strategies')
       .select('*')
@@ -80,6 +92,7 @@ export const dbHelpers = {
 
   // 保存或更新策略数据
   async upsertStrategy(strategyData: any) {
+    if (!supabase) return { error: new Error('Supabase not configured') };
     const user = await authHelpers.getCurrentUser();
     if (!user) {
       return { error: new Error('User not logged in') };
@@ -102,6 +115,7 @@ export const dbHelpers = {
 
   // 删除策略数据
   async deleteStrategy() {
+    if (!supabase) return { error: new Error('Supabase not configured') };
     const user = await authHelpers.getCurrentUser();
     if (!user) {
       return { error: new Error('User not logged in') };
