@@ -1,0 +1,452 @@
+'use client';
+
+import { useStore } from '@/lib/store';
+import { Download, Copy, ArrowLeft, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import jsPDF from 'jspdf';
+
+export default function ReportPage() {
+  const { data, setStep } = useStore();
+  const [copied, setCopied] = useState(false);
+
+  const handleExportPDF = () => {
+    const pdf = new jsPDF();
+    let y = 20;
+    const pageHeight = pdf.internal.pageSize.height;
+    const marginLeft = 20;
+    const maxWidth = 170;
+
+    // Helper function to add text with word wrap
+    const addWrappedText = (text: string, x: number, y: number, maxWidth: number, fontSize: number = 10) => {
+      pdf.setFontSize(fontSize);
+      const lines = pdf.splitTextToSize(text, maxWidth);
+      lines.forEach((line: string) => {
+        if (y > pageHeight - 20) {
+          pdf.addPage();
+          y = 20;
+        }
+        pdf.text(line, x, y);
+        y += fontSize * 0.5;
+      });
+      return y;
+    };
+
+    // Title
+    pdf.setFontSize(20);
+    pdf.setTextColor(30, 58, 138);
+    pdf.text('企业战略解码报告', marginLeft, y);
+    y += 15;
+
+    pdf.setFontSize(10);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(`生成时间: ${new Date().toLocaleString('zh-CN')}`, marginLeft, y);
+    y += 20;
+
+    // Section 1: Performance Review
+    if (data.step1) {
+      pdf.setFontSize(14);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('一、业绩复盘', marginLeft, y);
+      y += 10;
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('去年目标:', marginLeft, y);
+      y += 5;
+      y = addWrappedText(data.step1.goals || '无数据', marginLeft, y, maxWidth, 9);
+      y += 5;
+
+      pdf.text('实际完成:', marginLeft, y);
+      y += 5;
+      y = addWrappedText(data.step1.actuals || '无数据', marginLeft, y, maxWidth, 9);
+      y += 8;
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('复盘总结:', marginLeft, y);
+      y += 5;
+      y = addWrappedText(data.step1.summary || '无数据', marginLeft, y, maxWidth, 9);
+      y += 15;
+    }
+
+    // Section 2: Market & Opportunities
+    if (data.step2) {
+      if (y > pageHeight - 40) {
+        pdf.addPage();
+        y = 20;
+      }
+
+      pdf.setFontSize(14);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('二、市场与机会', marginLeft, y);
+      y += 10;
+
+      if (data.step2.swot) {
+        const { swot } = data.step2;
+        y = addWrappedText(`优势: ${swot.strengths.join('、')}`, marginLeft, y, maxWidth, 9);
+        y += 5;
+        y = addWrappedText(`劣势: ${swot.weaknesses.join('、')}`, marginLeft, y, maxWidth, 9);
+        y += 5;
+        y = addWrappedText(`机会: ${swot.opportunities.join('、')}`, marginLeft, y, maxWidth, 9);
+        y += 5;
+        y = addWrappedText(`威胁: ${swot.threats.join('、')}`, marginLeft, y, maxWidth, 9);
+        y += 10;
+
+        pdf.setFontSize(10);
+        pdf.setTextColor(0, 0, 0);
+        pdf.text('战略机会点:', marginLeft, y);
+        y += 5;
+        data.step2.strategicPoints?.forEach((point, idx) => {
+          y = addWrappedText(`${idx + 1}. ${point}`, marginLeft + 5, y, maxWidth - 5, 9);
+          y += 3;
+        });
+        y += 15;
+      }
+    }
+
+    // Section 3: Targets
+    if (data.step3?.targets) {
+      if (y > pageHeight - 40) {
+        pdf.addPage();
+        y = 20;
+      }
+
+      pdf.setFontSize(14);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('三、年度目标', marginLeft, y);
+      y += 10;
+
+      data.step3.targets.forEach((target, idx) => {
+        y = addWrappedText(`${idx + 1}. ${target.name} (${target.type === 'revenue' ? '营收' : target.type === 'market' ? '市场' : '其他'})`, marginLeft, y, maxWidth, 10);
+        y += 3;
+        y = addWrappedText(`   当前值: ${target.currentValue} | 目标值: ${target.targetValue}`, marginLeft, y, maxWidth, 9);
+        y += 3;
+        y = addWrappedText(`   ${target.description}`, marginLeft, y, maxWidth, 9);
+        y += 8;
+      });
+      y += 15;
+    }
+
+    // Section 4: Execution
+    if (data.step4) {
+      if (y > pageHeight - 40) {
+        pdf.addPage();
+        y = 20;
+      }
+
+      pdf.setFontSize(14);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('四、执行方案', marginLeft, y);
+      y += 10;
+
+      if (data.step4?.keyBattles?.length > 0) {
+        pdf.setFontSize(11);
+        pdf.text('关键战役:', marginLeft, y);
+        y += 5;
+        data.step4!.keyBattles.forEach((battle, idx) => {
+          y = addWrappedText(`${idx + 1}. ${battle.name} - ${battle.owner}`, marginLeft, y, maxWidth, 10);
+          y += 3;
+          y = addWrappedText(`   ${battle.description}`, marginLeft, y, maxWidth, 9);
+          y += 5;
+        });
+        y += 10;
+      }
+
+      if (y > pageHeight - 60) {
+        pdf.addPage();
+        y = 20;
+      }
+
+      if (data.step4?.quarterlyActions?.length > 0) {
+        pdf.setFontSize(11);
+        pdf.text('季度行动计划:', marginLeft, y);
+        y += 5;
+        ['Q1', 'Q2', 'Q3', 'Q4'].forEach(quarter => {
+          const actions = data.step4!.quarterlyActions.filter(a => a.quarter === quarter);
+          if (actions.length > 0) {
+            y = addWrappedText(`${quarter}:`, marginLeft, y, maxWidth, 10);
+            actions.forEach(action => {
+              y = addWrappedText(`   - ${action.action} (${action.deadline})`, marginLeft, y, maxWidth - 5, 9);
+            });
+            y += 5;
+          }
+        });
+      }
+    }
+
+    pdf.save('企业战略解码报告.pdf');
+  };
+
+  const handleCopyReport = () => {
+    let report = '# 企业战略解码报告\n';
+    report += `生成时间: ${new Date().toLocaleString('zh-CN')}\n\n`;
+
+    if (data.step1) {
+      report += '## 一、业绩复盘\n\n';
+      report += `**去年目标:**\n${data.step1.goals}\n\n`;
+      report += `**实际完成:**\n${data.step1.actuals}\n\n`;
+      report += `**复盘总结:**\n${data.step1.summary}\n\n`;
+    }
+
+    if (data.step2) {
+      report += '## 二、市场与机会\n\n';
+      if (data.step2.swot) {
+        report += '**SWOT 分析:**\n';
+        report += `- 优势: ${data.step2.swot.strengths.join('、')}\n`;
+        report += `- 劣势: ${data.step2.swot.weaknesses.join('、')}\n`;
+        report += `- 机会: ${data.step2.swot.opportunities.join('、')}\n`;
+        report += `- 威胁: ${data.step2.swot.threats.join('、')}\n\n`;
+      }
+      if (data.step2.strategicPoints) {
+        report += '**战略机会点:**\n';
+        data.step2.strategicPoints.forEach((point, idx) => {
+          report += `${idx + 1}. ${point}\n`;
+        });
+        report += '\n';
+      }
+    }
+
+    if (data.step3?.targets) {
+      report += '## 三、年度目标\n\n';
+      data.step3.targets.forEach((target, idx) => {
+        report += `${idx + 1}. **${target.name}** (${target.type === 'revenue' ? '营收' : target.type === 'market' ? '市场' : '其他'})\n`;
+        report += `   - 当前值: ${target.currentValue} | 目标值: ${target.targetValue}\n`;
+        report += `   - ${target.description}\n\n`;
+      });
+    }
+
+    if (data.step4) {
+      report += '## 四、执行方案\n\n';
+
+      if (data.step4?.keyBattles?.length > 0) {
+        report += '**关键战役:**\n';
+        data.step4!.keyBattles.forEach((battle, idx) => {
+          report += `${idx + 1}. ${battle.name} - ${battle.owner}\n`;
+          report += `   ${battle.description}\n\n`;
+        });
+      }
+
+      if (data.step4?.quarterlyActions?.length > 0) {
+        report += '**季度行动计划:**\n';
+        ['Q1', 'Q2', 'Q3', 'Q4'].forEach(quarter => {
+          const actions = data.step4!.quarterlyActions.filter(a => a.quarter === quarter);
+          if (actions.length > 0) {
+            report += `\n**${quarter}:**\n`;
+            actions.forEach(action => {
+              report += `- ${action.action} (${action.deadline})\n`;
+            });
+          }
+        });
+      }
+    }
+
+    navigator.clipboard.writeText(report).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+          战略解码报告
+        </h2>
+        <div className="flex gap-3">
+          <button
+            onClick={handleCopyReport}
+            className="px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300
+                       hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2
+                       transition-all duration-200"
+          >
+            {copied ? (
+              <>
+                <CheckCircle className="w-4 h-4 text-green-500" />
+                已复制
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4" />
+                复制报告
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg
+                       flex items-center gap-2 transition-all duration-200"
+          >
+            <Download className="w-4 h-4" />
+            导出 PDF
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-8 mb-6">
+        <div className="border-b border-gray-200 dark:border-slate-700 pb-4 mb-6">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            企业战略解码报告
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+            生成时间: {new Date().toLocaleString('zh-CN')}
+          </p>
+        </div>
+
+        <div className="space-y-8">
+          {/* Section 1: Performance Review */}
+          {data.step1 && (
+            <section>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-gray-200 dark:border-slate-700">
+                一、业绩复盘
+              </h4>
+              <div className="space-y-4">
+                <div>
+                  <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">去年目标</h5>
+                  <p className="text-sm text-gray-600 dark:text-slate-400 whitespace-pre-line">{data.step1.goals}</p>
+                </div>
+                <div>
+                  <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">实际完成</h5>
+                  <p className="text-sm text-gray-600 dark:text-slate-400 whitespace-pre-line">{data.step1.actuals}</p>
+                </div>
+                <div>
+                  <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">复盘总结</h5>
+                  <p className="text-sm text-gray-600 dark:text-slate-400 whitespace-pre-line">{data.step1.summary}</p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Section 2: Market & Opportunities */}
+          {data.step2 && (
+            <section>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-gray-200 dark:border-slate-700">
+                二、市场与机会
+              </h4>
+              <div className="space-y-4">
+                {data.step2.swot && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="border-l-4 border-green-500 pl-4">
+                      <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">优势</h5>
+                      <p className="text-sm text-gray-600 dark:text-slate-400">{data.step2.swot.strengths.join('、')}</p>
+                    </div>
+                    <div className="border-l-4 border-red-500 pl-4">
+                      <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">劣势</h5>
+                      <p className="text-sm text-gray-600 dark:text-slate-400">{data.step2.swot.weaknesses.join('、')}</p>
+                    </div>
+                    <div className="border-l-4 border-blue-500 pl-4">
+                      <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">机会</h5>
+                      <p className="text-sm text-gray-600 dark:text-slate-400">{data.step2.swot.opportunities.join('、')}</p>
+                    </div>
+                    <div className="border-l-4 border-yellow-500 pl-4">
+                      <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">威胁</h5>
+                      <p className="text-sm text-gray-600 dark:text-slate-400">{data.step2.swot.threats.join('、')}</p>
+                    </div>
+                  </div>
+                )}
+                {data.step2.strategicPoints && (
+                  <div>
+                    <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">战略机会点</h5>
+                    <ul className="space-y-2">
+                      {data.step2.strategicPoints.map((point, idx) => (
+                        <li key={idx} className="text-sm text-gray-600 dark:text-slate-400 flex items-start gap-2">
+                          <span className="text-primary-500 font-bold">{idx + 1}.</span>
+                          <span>{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* Section 3: Targets */}
+          {data.step3?.targets && data.step3.targets.length > 0 && (
+            <section>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-gray-200 dark:border-slate-700">
+                三、年度目标
+              </h4>
+              <div className="space-y-3">
+                {data.step3.targets.map((target, idx) => (
+                  <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded-lg p-4">
+                    <h5 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
+                      {idx + 1}. {target.name}
+                    </h5>
+                    <p className="text-sm text-gray-600 dark:text-slate-400 mb-2">{target.description}</p>
+                    <div className="text-sm">
+                      <span className="text-gray-500 dark:text-slate-500">当前值:</span>{' '}
+                      <span className="text-gray-700 dark:text-gray-300">{target.currentValue}</span>{' '}
+                      <span className="mx-2">→</span>{' '}
+                      <span className="text-gray-500 dark:text-slate-500">目标值:</span>{' '}
+                      <span className="font-semibold text-primary-600 dark:text-primary-400">{target.targetValue}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Section 4: Execution */}
+          {data.step4 && (
+            <section>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 pb-2 border-b border-gray-200 dark:border-slate-700">
+                四、执行方案
+              </h4>
+              <div className="space-y-6">
+                {data.step4?.keyBattles && data.step4!.keyBattles.length > 0 && (
+                  <div>
+                    <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">关键战役</h5>
+                    <div className="space-y-3">
+                      {data.step4!.keyBattles.map((battle, idx) => (
+                        <div key={idx} className="border-l-4 border-primary-500 pl-4">
+                          <h6 className="font-medium text-gray-900 dark:text-gray-100">{battle.name}</h6>
+                          <p className="text-sm text-gray-600 dark:text-slate-400">{battle.description}</p>
+                          <span className="text-xs text-gray-500 dark:text-slate-500">负责人: {battle.owner}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {data.step4?.quarterlyActions && data.step4!.quarterlyActions.length > 0 && (
+                  <div>
+                    <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">季度行动计划</h5>
+                    <div className="space-y-4">
+                      {['Q1', 'Q2', 'Q3', 'Q4'].map(quarter => {
+                        const actions = data.step4!.quarterlyActions.filter(a => a.quarter === quarter);
+                        if (actions.length === 0) return null;
+                        return (
+                          <div key={quarter}>
+                            <h6 className="font-medium text-gray-900 dark:text-gray-100 mb-2">{quarter}</h6>
+                            <ul className="space-y-1 ml-4">
+                              {actions.map((action, idx) => (
+                                <li key={idx} className="text-sm text-gray-600 dark:text-slate-400">
+                                  • {action.action} <span className="text-gray-400 dark:text-slate-500">({action.deadline})</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+        </div>
+      </div>
+
+      <div className="flex justify-center">
+        <button
+          onClick={() => setStep(4)}
+          className="px-6 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300
+                     hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2
+                     transition-all duration-200"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          返回修改
+        </button>
+      </div>
+    </div>
+  );
+}
