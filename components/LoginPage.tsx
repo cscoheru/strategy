@@ -46,20 +46,20 @@ export default function LoginPage() {
     try {
       if (isLogin) {
         // 登录
-        const { data, error } = await authHelpers.signInWithEmail(email, password);
-        if (error) throw error;
-        if (!data?.user) throw new Error('登录失败，请重试');
+        const result = await authHelpers.signInWithEmail(email, password);
+        if (result.error) throw result.error;
+        if (!result.data?.user) throw new Error('登录失败，请重试');
 
-        await login(data.user.id, email);
+        await login(result.data.user.id, email);
         router.push('/');
       } else {
         // 注册
-        const { data, error } = await authHelpers.signUpWithEmail(email, password);
-        if (error) throw error;
-        if (!data?.user) throw new Error('注册失败，请重试');
+        const result = await authHelpers.signUpWithEmail(email, password);
+        if (result.error) throw result.error;
+        if (!result.data?.user) throw new Error('注册失败，请重试');
 
         // 注册成功，自动登录
-        await login(data.user.id, email);
+        await login(result.data.user.id, email);
         router.push('/');
       }
     } catch (err: any) {
