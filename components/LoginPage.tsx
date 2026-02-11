@@ -47,16 +47,18 @@ export default function LoginPage() {
       if (isLogin) {
         // 登录
         const result = await authHelpers.signInWithEmail(email, password);
-        if (result.error) throw result.error;
-        if (!result.data?.user) throw new Error('登录失败，请重试');
+        if (result.error || !result.data?.user) {
+          throw new Error(result.error?.message || '登录失败，请重试');
+        }
 
         await login(result.data.user.id, email);
         router.push('/');
       } else {
         // 注册
         const result = await authHelpers.signUpWithEmail(email, password);
-        if (result.error) throw result.error;
-        if (!result.data?.user) throw new Error('注册失败，请重试');
+        if (result.error || !result.data?.user) {
+          throw new Error(result.error?.message || '注册失败，请重试');
+        }
 
         // 注册成功，自动登录
         await login(result.data.user.id, email);

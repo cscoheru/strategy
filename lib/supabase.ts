@@ -1,7 +1,13 @@
 /**
  * Supabase 客户端配置
  */
-import { createClient } from '@supabase/supabase-js';
+import { createClient, AuthResponse } from '@supabase/supabase-js';
+
+// 定义认证响应类型
+interface AuthResult {
+  data: AuthResponse['data'] | null;
+  error: Error | null;
+}
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -43,23 +49,23 @@ export const authHelpers = {
   },
 
   // 邮箱登录
-  async signInWithEmail(email: string, password: string) {
+  async signInWithEmail(email: string, password: string): Promise<AuthResult> {
     if (!supabase) return { data: null, error: new Error('Supabase not configured') };
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    return { data, error };
+    return { data, error: error || null };
   },
 
   // 邮箱注册
-  async signUpWithEmail(email: string, password: string) {
+  async signUpWithEmail(email: string, password: string): Promise<AuthResult> {
     if (!supabase) return { data: null, error: new Error('Supabase not configured') };
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
-    return { data, error };
+    return { data, error: error || null };
   },
 
   // 登出
