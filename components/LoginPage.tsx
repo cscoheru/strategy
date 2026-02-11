@@ -48,21 +48,19 @@ export default function LoginPage() {
         // 登录
         const { data, error } = await authHelpers.signInWithEmail(email, password);
         if (error) throw error;
+        if (!data?.user) throw new Error('登录失败，请重试');
 
-        if (data.user) {
-          await login(data.user.id, email);
-          router.push('/');
-        }
+        await login(data.user.id, email);
+        router.push('/');
       } else {
         // 注册
         const { data, error } = await authHelpers.signUpWithEmail(email, password);
         if (error) throw error;
+        if (!data?.user) throw new Error('注册失败，请重试');
 
         // 注册成功，自动登录
-        if (data.user) {
-          await login(data.user.id, email);
-          router.push('/');
-        }
+        await login(data.user.id, email);
+        router.push('/');
       }
     } catch (err: any) {
       console.error('Auth error:', err);
