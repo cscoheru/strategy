@@ -81,10 +81,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo / 标题 */}
         <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-lg mb-4">
+            <span className="text-3xl font-bold text-white">战</span>
+          </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
             企业战略解码工作台
           </h1>
@@ -94,15 +97,15 @@ export default function LoginPage() {
         </div>
 
         {/* 登录/注册表单 */}
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8">
+        <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200 dark:border-slate-700 p-8">
           {/* 切换按钮 */}
           <div className="flex bg-gray-100 dark:bg-slate-700 rounded-lg p-1 mb-6">
             <button
               onClick={() => setIsLogin(true)}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
                 isLogin
-                  ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-600'
               }`}
             >
               <LogIn className="w-4 h-4 inline mr-2" />
@@ -110,10 +113,10 @@ export default function LoginPage() {
             </button>
             <button
               onClick={() => setIsLogin(false)}
-              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
                 !isLogin
-                  ? 'bg-white dark:bg-slate-600 text-primary-600 dark:text-primary-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                  ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-600'
               }`}
             >
               <UserPlus className="w-4 h-4 inline mr-2" />
@@ -123,10 +126,10 @@ export default function LoginPage() {
 
           {/* 错误提示 */}
           {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg animate-fade-in">
               <div className="flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+                <p className="text-sm text-red-700 dark:text-red-300 font-medium">{error}</p>
               </div>
             </div>
           )}
@@ -205,14 +208,23 @@ export default function LoginPage() {
           </form>
 
           {/* 提示信息 */}
-          <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-sm text-blue-700 dark:text-blue-300">
-              <strong>💡 提示：</strong>
+          <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/30 dark:to-purple-900/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2">
+              💡 使用提示
             </p>
-            <ul className="text-xs text-blue-600 dark:text-blue-400 mt-2 space-y-1">
-              <li>• 未登录时数据保存在浏览器本地（试用模式）</li>
-              <li>• 登录后数据自动同步到云端（会员模式）</li>
-              <li>• 支持多设备访问，数据永不丢失</li>
+            <ul className="text-xs text-blue-600 dark:text-blue-400 space-y-1.5">
+              <li className="flex items-start gap-2">
+                <span className="text-blue-500 mt-0.5">•</span>
+                <span><strong>未登录时</strong>数据保存在浏览器本地（试用模式）</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-500 mt-0.5">•</span>
+                <span><strong>登录后</strong>数据自动同步到云端（会员模式）</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-blue-500 mt-0.5">•</span>
+                <span>支持多设备访问，数据永不丢失</span>
+              </li>
             </ul>
           </div>
         </div>
@@ -221,9 +233,9 @@ export default function LoginPage() {
         <div className="text-center mt-6">
           <button
             onClick={() => router.push('/')}
-            className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-500 dark:hover:text-primary-400"
+            className="text-sm text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
           >
-            返回首页
+            ← 返回首页
           </button>
         </div>
       </div>

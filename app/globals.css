@@ -58,3 +58,72 @@ body {
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
 }
+
+/* Print styles */
+@media print {
+  /* 隐藏不需要打印的元素 */
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* 移除打印时的内边距 */
+  .print\:px-0 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .print\:py-0 {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* 打印时的背景和文字颜色 */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 确保背景色打印出来 */
+  .bg-white {
+    background-color: white !important;
+  }
+
+  .dark\:bg-slate-800 {
+    background-color: white !important;
+  }
+
+  /* 打印时强制浅色文字 */
+  .text-gray-900,
+  .text-gray-100,
+  .dark\:text-gray-100,
+  .dark\:text-gray-300 {
+    color: black !important;
+  }
+
+  .text-gray-600,
+  .dark\:text-slate-400,
+  .text-gray-700,
+  .dark\:text-gray-300 {
+    color: #333 !important;
+  }
+
+  /* 链接不显示下划线 */
+  a {
+    text-decoration: none !important;
+    color: black !important;
+  }
+
+  /* 分页控制 */
+  section {
+    page-break-inside: avoid;
+  }
+
+  h4, h3 {
+    page-break-after: avoid;
+  }
+
+  /* 页面边距 */
+  @page {
+    margin: 2cm;
+  }
+}

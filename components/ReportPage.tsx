@@ -1,35 +1,16 @@
 'use client';
 
 import { useStore } from '@/lib/store';
-import { Download, Copy, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Download, Copy, ArrowLeft, CheckCircle, Printer } from 'lucide-react';
 import { useState } from 'react';
-import jsPDF from 'jspdf';
 
 export default function ReportPage() {
   const { data, setStep } = useStore();
   const [copied, setCopied] = useState(false);
 
-  const handleExportPDF = () => {
-    const pdf = new jsPDF();
-    let y = 20;
-    const pageHeight = pdf.internal.pageSize.height;
-    const marginLeft = 20;
-    const maxWidth = 170;
-
-    // Helper function to add text with word wrap
-    const addWrappedText = (text: string, x: number, y: number, maxWidth: number, fontSize: number = 10) => {
-      pdf.setFontSize(fontSize);
-      const lines = pdf.splitTextToSize(text, maxWidth);
-      lines.forEach((line: string) => {
-        if (y > pageHeight - 20) {
-          pdf.addPage();
-          y = 20;
-        }
-        pdf.text(line, x, y);
-        y += fontSize * 0.5;
-      });
-      return y;
-    };
+  const handlePrint = () => {
+    window.print();
+  };
 
     // Title
     pdf.setFontSize(20);
@@ -247,8 +228,8 @@ export default function ReportPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 print:px-0 print:py-0">
+      <div className="flex items-center justify-between mb-8 print:hidden">
         <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
           战略解码报告
         </h2>
@@ -272,12 +253,12 @@ export default function ReportPage() {
             )}
           </button>
           <button
-            onClick={handleExportPDF}
+            onClick={handlePrint}
             className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg
                        flex items-center gap-2 transition-all duration-200"
           >
-            <Download className="w-4 h-4" />
-            导出 PDF
+            <Printer className="w-4 h-4" />
+            打印/导出PDF
           </button>
         </div>
       </div>
