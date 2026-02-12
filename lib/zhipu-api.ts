@@ -1169,3 +1169,281 @@ export async function extractTextFromFile(file: File): Promise<string> {
   // 对于其他类型，返回基本信息
   return `[文件] ${file.name}\n文件类型: ${file.type}\n大小: ${(file.size / 1024).toFixed(2)} KB`;
 }
+
+// ========== Step 2 新增：洞察小结和 TOWS 交叉策略 ==========
+
+/**
+ * 生成洞察小结 (AI 分析外部环境)
+ * 基于行业趋势、客户需求、竞对优势等信息，生成 SWOT 洞察
+ */
+export async function generateInsightSummary(
+  apiKey: string,
+  trends: string,
+  customerKbf: string[],
+  competitorCsf: Array<{ competitorName: string; advantage: string }>,
+  companyInfo: string
+): Promise<{
+  strengths: string;
+  weaknesses: string;
+  opportunities: string;
+  threats: string;
+}> {
+  const messages: ZhipuMessage[] = [
+    {
+      role: 'system',
+      content: `你是一位资深的战略分析专家，擅长从外部环境分析中提炼 SWOT 洞察。
+
+**任务目标**：
+基于用户提供的行业趋势、客户需求、竞对优势、公司情况，生成一份"外部环境洞察小结"。
+
+**分析逻辑**：
+- **Strengths (优势)**：我司相对于竞对的独特能力（基于竞对CSF分析）
+- **Weaknesses (劣势)**：我司存在的短板（基于竞对CSF对比）
+- **Opportunities (机会)**：行业趋势中带来的增长点
+- **Threats (威胁)**：行业趋势或竞争压力带来的风险
+
+**输出要求**：
+- 每个 SWOT 维度用 2-4 句话总结
+- 具体化、可落地，避免泛泛而谈
+- 直接引用输入信息中的关键要素`
+    },
+    {
+      role: 'user',
+      content: `请基于以下信息，生成外部环境洞察小结：
+
+【行业趋势】
+${trends}
+
+【客户关键购买因素 (KBF)】
+${customerKbf.map((kbf, i) => `${i + 1}. ${kbf}`).join('\n')}
+
+【竞对核心优势 (CSF)】
+${competitorCsf.map((csf, i) => `${i + 1}. ${csf.competitorName}：${csf.advantage}`).join('\n')}
+
+【本公司情况】
+${companyInfo}
+
+请以 JSON 格式返回：
+{
+  "strengths": "我司优势总结（2-4句话）",
+  "weaknesses": "我司劣势总结（2-4句话）",
+  "opportunities": "行业机会总结（2-4句话）",
+  "threats": "行业威胁总结（2-4句话）"
+}`
+    }
+  ];
+
+  const response = await callZhipuAPI(apiKey, messages);
+
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    console.error('解析洞察小结 JSON 失败:', e);
+  }
+
+  return {
+    strengths: '待分析',
+    weaknesses: '待分析',
+    opportunities: '待分析',
+    threats: '待分析'
+  };
+}
+
+/**
+ * 生成 TOWS 交叉策略
+ * 基于 SWOT 分析，生成 SO/WO/ST/WT 四类交叉策略
+ */
+export async function generateTOWSStrategies(
+  apiKey: string,
+  swot: {
+    strengths: string[];
+    weaknesses: string[];
+    opportunities: string[];
+    threats: string[];
+  },
+  strategicDirection?: string
+): Promise<{
+  so: string[];
+  wo: string[];
+  st: string[];
+  wt: string[];
+}> {
+  const messages: ZhipuMessage[] = [
+    {
+      role: 'system',
+      content: `你是一位资深的战略规划专家，擅长使用 TOWS 矩阵（SWOT 交叉分析）生成战略选项。
+
+**TOWS 分析框架**：
+1. **SO 策略 (优势-机会)**：利用内部优势把握外部机会
+   - 示例："利用我司技术领先优势，拓展新兴市场"
+
+2. **WO 策略 (劣势-机会)**：弥补内部劣势以把握外部机会
+   - 示例："通过战略合作补齐产能短板，抓住行业增长机遇"
+
+3. **ST 策略 (优势-威胁)**：利用内部优势抵御外部威胁
+   - 示例："发挥品牌优势，抵御低价竞争冲击"
+
+4. **WT 策略 (劣势-威胁)**：减少内部劣势并规避外部威胁
+   - 示例："收缩非核心业务，降低经营风险"
+
+**输出要求**：
+- 每类策略生成 2-3 条
+- 策略要具体可落地，避免泛泛而谈
+- 明确引用 SWOT 中的具体要素`
+    },
+    {
+      role: 'user',
+      content: `请基于以下 SWOT 分析，生成 TOWS 交叉策略：
+
+【SWOT 分析】
+**优势 (S)**：
+${swot.strengths.map((s, i) => `${i + 1}. ${s}`).join('\n')}
+
+**劣势 (W)**：
+${swot.weaknesses.map((w, i) => `${i + 1}. ${w}`).join('\n')}
+
+**机会 (O)**：
+${swot.opportunities.map((o, i) => `${i + 1}. ${o}`).join('\n')}
+
+**威胁 (T)**：
+${swot.threats.map((t, i) => `${i + 1}. ${t}`).join('\n')}
+
+${strategicDirection ? `【初步战略方向】\n${strategicDirection}\n` : ''}请以 JSON 格式返回：
+{
+  "so": ["SO策略1", "SO策略2"],
+  "wo": ["WO策略1", "WO策略2"],
+  "st": ["ST策略1", "ST策略2"],
+  "wt": ["WT策略1", "WT策略2"]
+}
+
+要求：
+- 每类策略至少 2 条
+- 策略要明确引用 SWOT 中的具体要素`
+    }
+  ];
+
+  const response = await callZhipuAPI(apiKey, messages);
+
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    console.error('解析 TOWS JSON 失败:', e);
+  }
+
+  return {
+    so: ['待分析：利用优势把握机会'],
+    wo: ['待分析：弥补劣势把握机会'],
+    st: ['待分析：利用优势抵御威胁'],
+    wt: ['待分析：减少劣势规避威胁']
+  };
+}
+
+/**
+ * 生成产品-客户矩阵 (Ansoff 矩阵映射)
+ * 基于 SWOT 和战略方向，推荐四个象限的具体策略
+ */
+export async function generateProductCustomerMatrix(
+  apiKey: string,
+  swot: {
+    strengths: string[];
+    weaknesses: string[];
+    opportunities: string[];
+    threats: string[];
+  },
+  strategicDirection: string
+): Promise<{
+  marketPenetration: string[];
+  productDevelopment: string[];
+  marketDevelopment: string[];
+  diversification: string[];
+}> {
+  const messages: ZhipuMessage[] = [
+    {
+      role: 'system',
+      content: `你是一位资深的战略规划专家，擅长使用 Ansoff 矩阵（产品-市场矩阵）制定增长策略。
+
+**Ansoff 矩阵框架**：
+1. **市场渗透 (老客户+老产品)**：提高现有产品在现有市场的占有率
+   - 策略：提升客户复购、交叉销售、价格优化、客户忠诚度计划
+
+2. **产品开发 (老客户+新产品)**：向现有客户推出新产品/服务
+   - 策略：产品线延伸、升级换代、增值服务、捆绑销售
+
+3. **市场开发 (新产品+老客户)**：将现有产品推向新客户群/新区域
+   - 策略：区域扩张、新客户群体、渠道拓展、出口贸易
+
+4. **多元化 (新客户+新产品)**：进入全新业务领域
+   - 策略：并购、战略投资、新业务孵化、战略联盟
+
+**输出要求**：
+- 每个象限推荐 2-3 条具体策略
+- 策略要基于 SWOT 分析和战略方向
+- 考虑风险收益平衡`
+    },
+    {
+      role: 'user',
+      content: `请基于以下信息，生成产品-客户增长矩阵：
+
+【战略方向】
+${strategicDirection}
+
+【SWOT 分析】
+**优势**：${swot.strengths.join('、')}
+**劣势**：${swot.weaknesses.join('、')}
+**机会**：${swot.opportunities.join('、')}
+**威胁**：${swot.threats.join('、')}
+
+请以 JSON 格式返回：
+{
+  "marketPenetration": ["策略1", "策略2", "策略3"],
+  "productDevelopment": ["策略1", "策略2", "策略3"],
+  "marketDevelopment": ["策略1", "策略2", "策略3"],
+  "diversification": ["策略1", "策略2"]
+}
+
+要求：
+- 每个象限至少 2 条策略
+- 策略要具体可落地
+- 优先推荐风险可控、收益明显的策略`
+    }
+  ];
+
+  const response = await callZhipuAPI(apiKey, messages);
+
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+  } catch (e) {
+    console.error('解析产品-客户矩阵 JSON 失败:', e);
+  }
+
+  return {
+    marketPenetration: [
+      '提高现有客户复购率',
+      '优化定价策略提升利润',
+      '加强客户忠诚度计划'
+    ],
+    productDevelopment: [
+      '向现有客户推出新产品',
+      '提供增值服务套餐',
+      '产品升级换代'
+    ],
+    marketDevelopment: [
+      '拓展新的区域市场',
+      '开发新的客户群体',
+      '拓展新的销售渠道'
+    ],
+    diversification: [
+      '探索新业务领域',
+      '考虑战略并购机会'
+    ]
+  };
+}

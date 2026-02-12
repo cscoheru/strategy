@@ -39,25 +39,59 @@ export interface Step1Data {
   rootCause: string; // 最终锁定的核心短板
 }
 
-// ========== 客户需求洞察模块 ==========
+// ========== Step 2 数据结构 ==========
+// 客户需求洞察
 export interface CustomerInsight {
-  profile: string;           // 典型客户画像
-  kbf: string[];             // 关键购买因素 (Key Buying Factors)
-  kbfLocked: boolean;        // 是否已确认
+  profile: string;
+  kbf: string[];
+  kbfLocked: boolean;
 }
 
-// ========== 竞对优势分析模块 ==========
+// 竞对优势分析
 export interface CompetitorAdvantage {
   id: string;
   competitorName: string;
-  advantage: string;         // 竞对的核心必杀技
-  category?: string;         // 可选：优势分类
+  advantage: string;
+  category?: string;
 }
 
 export interface CompetitorAnalysis {
   advantages: CompetitorAdvantage[];
-  searchResults?: string;    // 用户粘贴的搜索结果
-  analysisLocked: boolean;   // 是否已确认
+  searchResults?: string;
+  analysisLocked: boolean;
+}
+
+// KSF 维度（带推导理由）
+export interface KSFDimension {
+  id: string;
+  name: string;
+  description: string;
+  reasoning: string;
+}
+
+// 竞争对标评分
+export interface BenchmarkScore {
+  dimensionId: string;
+  dimensionName: string;
+  myScore: number;
+  competitorScore: number;
+  ranking: 'high' | 'medium' | 'low';
+}
+
+// 洞察小结（新增）
+export interface InsightSummary {
+  strengths: string;   // 用户手动总结或 AI 生成的优势
+  weaknesses: string;  // 用户手动总结或 AI 生成的劣势
+  opportunities: string; // 用户手动总结或 AI 生成的机会
+  threats: string;    // 用户手动总结或 AI 生成的威胁
+}
+
+// 产品-客户矩阵（新增）
+export interface ProductCustomerMatrix {
+  marketPenetration: string[];   // 老客户+老产品
+  productDevelopment: string[];    // 老客户+新产品
+  marketDevelopment: string[];    // 新客户+老产品
+  diversification: string[];       // 新客户+新产品
 }
 
 export interface Step2Data {
@@ -68,13 +102,13 @@ export interface Step2Data {
   competitorsFile?: { name: string; content: string };
   companyInfo: string;
 
-  // 客户需求洞察（新增）
+  // 客户需求洞察
   customerInsight: CustomerInsight;
 
-  // 竞对优势分析（新增）
+  // 竞对优势分析
   competitorAnalysis: CompetitorAnalysis;
 
-  // KSF 分析（增强版，带推导理由）
+  // KSF 分析
   ksfDimensions: KSFDimension[];
   ksfLocked: boolean;
 
@@ -82,156 +116,92 @@ export interface Step2Data {
   benchmarkScores: BenchmarkScore[];
   benchmarkLocked: boolean;
 
-  // SWOT（基于以上分析生成）
+  // 洞察小结（新增）
+  insightSummary?: InsightSummary;
+
+  // SWOT（合并洞察小结 + 对标推导）
   swot: {
     strengths: string[];
     weaknesses: string[];
     opportunities: string[];
     threats: string[];
   };
-  strategicPoints: string[];
+  swotLocked?: boolean;
+
+  // TOWS 交叉策略推演
+  towsStrategies?: {
+    so: string[];
+    wo: string[];
+    st: string[];
+    wt: string[];
+  };
+  towsGenerated?: boolean;
+
+  // 战略方向决策
+  strategicDirection?: string;
+  aiStrategicRecommendation?: string;
+
+  // 产品-客户矩阵
+  productCustomerMatrix?: ProductCustomerMatrix;
+  matrixGenerated?: boolean;
 }
 
-export interface KSFDimension {
-  id: string;
-  name: string;
-  description: string;
-  reasoning: string;         // 新增：推导理由（显示为什么推荐这个KSF）
+// ========== Step 3 数据结构 ==========
+export interface MatrixData {
+  oldClients: string[];    // 老客户/存量市场
+  newClients: string[];    // 新客户/增量市场
+  oldProducts: string[];   // 原有产品/服务
+  newProducts: string[];   // 新产品/服务
+  values: {
+    [key: string]: number;  // 格式: "client_id_product_id": 金额
+  };
 }
 
-export interface BenchmarkScore {
-  dimensionId: string;
-  dimensionName: string;
-  myScore: number; // 1-10
-  competitorScore: number; // 1-10
-  ranking: 'high' | 'medium' | 'low';
-}
-
-export interface Target {
-  name: string;
-  type: 'revenue' | 'market' | 'other';
-  currentValue: number;
-  targetValue: number;
-  description: string;
+export interface CalculatedTargets {
+  base: number;      // 保底目标
+  standard: number;   // 达标目标
+  challenge: number;    // 挑战目标
 }
 
 export interface Step3Data {
-  targets: Target[];
+  matrixData: MatrixData;
+  calculatedTargets: CalculatedTargets;
+  confidenceIndex: number; // 信心指数 100-200
 }
 
-export interface KeyBattle {
-  name: string;
+// ========== Step 4 数据结构（保留，后续开发）==========
+export interface ExecutionTask {
+  id: string;
+  title: string;
   description: string;
-  owner: string;
-}
-
-export interface QuarterlyAction {
-  quarter: string;
-  action: string;
+  quadrant: 'marketPenetration' | 'productDevelopment' | 'marketDevelopment' | 'diversification';
+  priority: 'high' | 'medium' | 'low';
   deadline: string;
+  assignee?: string;
+  status: 'pending' | 'inProgress' | 'completed';
 }
 
 export interface Step4Data {
-  keyBattles: KeyBattle[];
-  quarterlyActions: QuarterlyAction[];
+  tasks: ExecutionTask[];
+  ganttChart?: any;
 }
 
+// ========== 全局数据结构 ==========
 export interface StrategicData {
-  step1?: Step1Data;
-  step2?: Step2Data;
+  step1: Step1Data;
+  step2: Step2Data;
   step3?: Step3Data;
   step4?: Step4Data;
 }
 
-export type Step = 1 | 2 | 3 | 4 | 'report';
-
-// 模型供应商类型
-export type ModelProvider = 'zhipu' | 'openai' | 'qwen' | 'deepseek' | 'wenxin' | 'ollama' | 'custom';
-
 export interface ModelConfig {
-  provider: ModelProvider;
+  provider: 'zhipu';
   apiKey: string;
-  baseUrl?: string;
-  model?: string;
+  baseUrl: string;
+  model: string;
 }
 
 export interface CompanyInfo {
   name: string;
   industry: string;
 }
-
-export interface ProviderOption {
-  id: ModelProvider;
-  name: string;
-  models: string[];
-  defaultModel: string;
-  requiresBaseUrl: boolean;
-  baseUrlPlaceholder: string;
-  helpUrl?: string;
-}
-
-export const PROVIDER_OPTIONS: ProviderOption[] = [
-  {
-    id: 'zhipu',
-    name: '智谱 AI (GLM-4)',
-    models: ['glm-4-flash', 'glm-4', 'glm-4-plus', 'glm-3-turbo'],
-    defaultModel: 'glm-4-flash',
-    requiresBaseUrl: false,
-    baseUrlPlaceholder: '',
-    helpUrl: 'https://open.bigmodel.cn/usercenter/apikeys'
-  },
-  {
-    id: 'openai',
-    name: 'OpenAI (GPT-4)',
-    models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-    defaultModel: 'gpt-4o',
-    requiresBaseUrl: false,
-    baseUrlPlaceholder: '',
-    helpUrl: 'https://platform.openai.com/api-keys'
-  },
-  {
-    id: 'qwen',
-    name: '通义千问',
-    models: ['qwen-max', 'qwen-plus', 'qwen-turbo'],
-    defaultModel: 'qwen-plus',
-    requiresBaseUrl: false,
-    baseUrlPlaceholder: '',
-    helpUrl: 'https://bailian.console.aliyun.com/'
-  },
-  {
-    id: 'deepseek',
-    name: 'DeepSeek',
-    models: ['deepseek-chat', 'deepseek-coder'],
-    defaultModel: 'deepseek-chat',
-    requiresBaseUrl: false,
-    baseUrlPlaceholder: '',
-    helpUrl: 'https://platform.deepseek.com/api_keys'
-  },
-  {
-    id: 'wenxin',
-    name: '文心一言 (ERNIE)',
-    models: ['ernie-4.0', 'ernie-3.5', 'ernie-speed'],
-    defaultModel: 'ernie-3.5',
-    requiresBaseUrl: false,
-    baseUrlPlaceholder: '',
-    helpUrl: 'https://cloud.baidu.com/doc/WENXINWORKSHOP/s/Nlks5zkzu'
-  },
-  {
-    id: 'ollama',
-    name: 'Ollama (本地模型)',
-    models: ['llama2', 'mistral', 'codellama', 'custom'],
-    defaultModel: 'llama2',
-    requiresBaseUrl: true,
-    baseUrlPlaceholder: 'http://localhost:11434',
-    helpUrl: 'https://ollama.ai/'
-  },
-  {
-    id: 'custom',
-    name: '自定义 API',
-    models: [],
-    defaultModel: 'custom-model',
-    requiresBaseUrl: true,
-    baseUrlPlaceholder: 'https://api.example.com/v1',
-    helpUrl: ''
-  }
-];

@@ -8,7 +8,10 @@ import {
   analyzeCompetitorCSF,
   extractKSFDimensions,
   generateBenchmarkScores,
-  generateSWOTFromBenchmark
+  generateSWOTFromBenchmark,
+  generateTOWSStrategies,
+  generateProductCustomerMatrix,
+  generateInsightSummary
 } from '@/lib/zhipu-api';
 import AIAnalysisChat from './AIAnalysisChat';
 import {
@@ -76,6 +79,37 @@ export default function Step2Insight() {
   // ========== SWOT 结果 ==========
   const [swot, setSwot] = useState(data.step2?.swot || { strengths: [], weaknesses: [], opportunities: [], threats: [] });
   const [strategicPoints, setStrategicPoints] = useState<string[]>(data.step2?.strategicPoints || []);
+  const [swotLocked, setSwotLocked] = useState(data.step2?.swotLocked || false);
+  const [isEditingSwot, setIsEditingSwot] = useState(false);
+
+  // ========== 洞察小结（新增）==========
+  const [insightSummary, setInsightSummary] = useState({
+    strengths: data.step2?.insightSummary?.strengths || '',
+    weaknesses: data.step2?.insightSummary?.weaknesses || '',
+    opportunities: data.step2?.insightSummary?.opportunities || '',
+    threats: data.step2?.insightSummary?.threats || ''
+  });
+  const [isGeneratingInsight, setIsGeneratingInsight] = useState(false);
+
+  // ========== TOWS 交叉策略推演（新增）==========
+  const [towsStrategies, setTowsStrategies] = useState(data.step2?.towsStrategies || { so: [], wo: [], st: [], wt: [] });
+  const [towsGenerated, setTowsGenerated] = useState(data.step2?.towsGenerated || false);
+  const [isGeneratingTows, setIsGeneratingTows] = useState(false);
+
+  // ========== 战略方向决策（新增）==========
+  const [strategicDirection, setStrategicDirection] = useState<string | undefined>(data.step2?.strategicDirection);
+  const [aiStrategicRecommendation, setAiStrategicRecommendation] = useState<string | undefined>(data.step2?.aiStrategicRecommendation);
+  const [isAnalyzingDirection, setIsAnalyzingDirection] = useState(false);
+
+  // ========== 产品-客户矩阵（新增）==========
+  const [productCustomerMatrix, setProductCustomerMatrix] = useState(data.step2?.productCustomerMatrix || {
+    marketPenetration: [],
+    productDevelopment: [],
+    marketDevelopment: [],
+    diversification: []
+  });
+  const [matrixGenerated, setMatrixGenerated] = useState(data.step2?.matrixGenerated || false);
+  const [isGeneratingMatrix, setIsGeneratingMatrix] = useState(false);
 
   // 数据恢复状态
   const [showDataRestored, setShowDataRestored] = useState(false);
@@ -122,7 +156,33 @@ export default function Step2Insight() {
 
         // 恢复 SWOT 结果
         setSwot(step2Data.swot || { strengths: [], weaknesses: [], opportunities: [], threats: [] });
+        setSwotLocked(step2Data.swotLocked || false);
         setStrategicPoints(step2Data.strategicPoints || []);
+
+        // 恢复洞察小结
+        setInsightSummary(step2Data.insightSummary || {
+          strengths: '',
+          weaknesses: '',
+          opportunities: '',
+          threats: ''
+        });
+
+        // 恢复 TOWS 策略
+        setTowsStrategies(step2Data.towsStrategies || { so: [], wo: [], st: [], wt: [] });
+        setTowsGenerated(step2Data.towsGenerated || false);
+
+        // 恢复战略方向
+        setStrategicDirection(step2Data.strategicDirection);
+        setAiStrategicRecommendation(step2Data.aiStrategicRecommendation);
+
+        // 恢复产品-客户矩阵
+        setProductCustomerMatrix(step2Data.productCustomerMatrix || {
+          marketPenetration: [],
+          productDevelopment: [],
+          marketDevelopment: [],
+          diversification: []
+        });
+        setMatrixGenerated(step2Data.matrixGenerated || false);
 
         // 显示数据恢复提示
         setShowDataRestored(true);
@@ -130,6 +190,42 @@ export default function Step2Insight() {
       }
     }
   }, []); // 只在组件挂载时执行一次
+
+  // ========== 实时计算 SWOT（对标打分联动）==========
+  useEffect(() => {
+    // 只有在未锁定 SWOT 编辑时才自动更新
+    if (swotLocked || benchmarkScores.length === 0) return;
+
+    // 实时计算 S 和 W（基于对标分数差异）
+    const newStrengths: string[] = [];
+    const newWeaknesses: string[] = [];
+
+    benchmarkScores.forEach(score => {
+      const diff = score.myScore - score.competitorScore;
+
+      if (diff >= 1) {
+        // 我司显著领先 -> 优势
+        const reason = `我司在${score.dimensionName}上领先竞对${diff}分（${score.myScore} vs ${score.competitorScore}）`;
+        if (!newStrengths.includes(reason)) {
+          newStrengths.push(reason);
+        }
+      } else if (diff <= -1) {
+        // 竞对显著领先 -> 劣势
+        const reason = `我司在${score.dimensionName}上落后竞对${Math.abs(diff)}分（${score.myScore} vs ${score.competitorScore}）`;
+        if (!newWeaknesses.includes(reason)) {
+          newWeaknesses.push(reason);
+        }
+      }
+      // 差异在 -1 到 1 之间视为"均势"，不显示在 S/W 中
+    });
+
+    // O 和 T 保持不变（来自行业趋势分析）
+    setSwot(prev => ({
+      ...prev,
+      strengths: newStrengths,
+      weaknesses: newWeaknesses
+    }));
+  }, [benchmarkScores, swotLocked]); // 监听对标分数变化
 
   // 文件上传处理（Mock）
   const handleFileUpload = async (file: File | null, type: 'trends' | 'competitors') => {
@@ -327,20 +423,195 @@ export default function Step2Insight() {
       return;
     }
 
+    if (benchmarkScores.length === 0) {
+      alert('请先完成竞争力对标');
+      return;
+    }
+
     setIsBenchmarking(true);
     try {
-      const result = await generateSWOTFromBenchmark(
-        modelConfig.apiKey,
-        benchmarkScores,
-        trends,
-        companyInfo
-      );
-      setSwot(result.swot);
-      setStrategicPoints(result.strategicPoints);
+      // 1. 基于对标生成本地推导的 S 和 W
+      const localStrengths: string[] = [];
+      const localWeaknesses: string[] = [];
+
+      benchmarkScores.forEach(score => {
+        const diff = score.myScore - score.competitorScore;
+        if (diff >= 1) {
+          localStrengths.push(`我司在${score.dimensionName}上领先竞对${diff}分`);
+        } else if (diff <= -1) {
+          localWeaknesses.push(`我司在${score.dimensionName}上落后竞对${Math.abs(diff)}分`);
+        }
+      });
+
+      // 2. 合并洞察小结和对标推导
+      const finalSwot = {
+        strengths: [
+          ...localStrengths,  // 对标推导的优势
+          ...(insightSummary.strengths ? insightSummary.strengths.split('\n').filter(s => s.trim()) : [])  // 洞察小结的优势
+        ],
+        weaknesses: [
+          ...localWeaknesses,  // 对标推导的劣势
+          ...(insightSummary.weaknesses ? insightSummary.weaknesses.split('\n').filter(w => w.trim()) : [])  // 洞察小结的劣势
+        ],
+        opportunities: insightSummary.opportunities ? insightSummary.opportunities.split('\n').filter(o => o.trim()) : [],
+        threats: insightSummary.threats ? insightSummary.threats.split('\n').filter(t => t.trim()) : []
+      };
+
+      setSwot(finalSwot);
     } catch (error: any) {
       alert(`SWOT 生成失败: ${error.message}`);
     } finally {
       setIsBenchmarking(false);
+    }
+  };
+
+  // ========== SWOT 编辑功能 ==========
+
+  const handleAddSwotItem = (category: 'strengths' | 'weaknesses' | 'opportunities' | 'threats', item: string) => {
+    if (item.trim()) {
+      setSwot(prev => ({
+        ...prev,
+        [category]: [...prev[category], item.trim()]
+      }));
+    }
+  };
+
+  const handleRemoveSwotItem = (category: 'strengths' | 'weaknesses' | 'opportunities' | 'threats', index: number) => {
+    setSwot(prev => ({
+      ...prev,
+      [category]: prev[category].filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleUpdateSwotItem = (category: 'strengths' | 'weaknesses' | 'opportunities' | 'threats', index: number, value: string) => {
+    setSwot(prev => {
+      const newItems = [...prev[category]];
+      newItems[index] = value;
+      return {
+        ...prev,
+        [category]: newItems
+      };
+    });
+  };
+
+  const handleLockSwot = () => {
+    setSwotLocked(true);
+  };
+
+  // ========== 洞察小结功能 ==========
+
+  const handleGenerateInsightSummary = async () => {
+    if (!modelConfig.apiKey) {
+      alert('请先配置 AI API Key');
+      return;
+    }
+
+    // 检查是否有足够的数据
+    const hasData = trends || competitors || companyInfo || customerProfile || competitorAdvantages.length > 0;
+    if (!hasData) {
+      alert('请先填写部分数据以便 AI 总结');
+      return;
+    }
+
+    setIsGeneratingInsight(true);
+    try {
+      const summary = await generateInsightSummary(
+        modelConfig.apiKey,
+        trends,
+        competitors,
+        companyInfo,
+        customerProfile,
+        customerKbf,
+        competitorAdvantages
+      );
+
+      setInsightSummary(summary);
+    } catch (error: any) {
+      alert(`洞察总结失败: ${error.message}`);
+    } finally {
+      setIsGeneratingInsight(false);
+    }
+  };
+
+  const handleUpdateInsightSummary = (field: 'strengths' | 'weaknesses' | 'opportunities' | 'threats', value: string) => {
+    setInsightSummary(prev => ({ ...prev, [field]: value }));
+  };
+
+  // ========== TOWS 交叉策略推演功能 ==========
+
+  const handleGenerateTOWS = async () => {
+    if (!modelConfig.apiKey) {
+      alert('请先配置 AI API Key');
+      return;
+    }
+
+    // 检查 SWOT 是否有内容
+    const hasSWOTContent =
+      swot.strengths.length > 0 ||
+      swot.weaknesses.length > 0 ||
+      swot.opportunities.length > 0 ||
+      swot.threats.length > 0;
+
+    if (!hasSWOTContent) {
+      alert('请先生成 SWOT 矩阵');
+      return;
+    }
+
+    setIsGeneratingTows(true);
+    try {
+      const result = await generateTOWSStrategies(
+        modelConfig.apiKey,
+        swot
+      );
+
+      setTowsStrategies({
+        so: result.so,
+        wo: result.wo,
+        st: result.st,
+        wt: result.wt
+      });
+      setAiStrategicRecommendation(result.strategicRecommendation);
+      setTowsGenerated(true);
+    } catch (error: any) {
+      alert(`TOWS 分析失败: ${error.message}`);
+    } finally {
+      setIsGeneratingTows(false);
+    }
+  };
+
+  // ========== 战略方向选择功能 ==========
+
+  const handleSelectDirection = (direction: string) => {
+    setStrategicDirection(direction);
+  };
+
+  // ========== 产品-客户矩阵生成功能 ==========
+
+  const handleGenerateMatrix = async () => {
+    if (!modelConfig.apiKey) {
+      alert('请先配置 AI API Key');
+      return;
+    }
+
+    if (!towsGenerated) {
+      alert('请先生成 TOWS 交叉策略');
+      return;
+    }
+
+    setIsGeneratingMatrix(true);
+    try {
+      const result = await generateProductCustomerMatrix(
+        modelConfig.apiKey,
+        towsStrategies,
+        strategicDirection
+      );
+
+      setProductCustomerMatrix(result);
+      setMatrixGenerated(true);
+    } catch (error: any) {
+      alert(`产品-客户矩阵生成失败: ${error.message}`);
+    } finally {
+      setIsGeneratingMatrix(false);
     }
   };
 
@@ -388,7 +659,15 @@ export default function Step2Insight() {
       ksfLocked,
       benchmarkScores,
       benchmarkLocked,
+      insightSummary,
       swot,
+      swotLocked,
+      towsStrategies,
+      towsGenerated,
+      strategicDirection,
+      aiStrategicRecommendation,
+      productCustomerMatrix,
+      matrixGenerated,
       strategicPoints
     };
     setData('step2', step2Data);
@@ -397,8 +676,8 @@ export default function Step2Insight() {
 
   // 下一步
   const handleNext = () => {
-    if (strategicPoints.length === 0) {
-      alert('请先生成 SWOT 和战略机会点');
+    if (!matrixGenerated) {
+      alert('请完成所有分析步骤（包括产品-客户矩阵）后再进入下一步');
       return;
     }
     handleSave();
@@ -414,13 +693,16 @@ export default function Step2Insight() {
   // 计算当前进度
   const calculateProgress = () => {
     let completed = 0;
-    let total = 5;
+    let total = 8; // 更新为 8 个阶段（增加了洞察小结）
 
     if (trends.trim()) completed++;
     if (customerProfile.trim() && customerKbf.length >= 3 && kbfLocked) completed++;
     if (competitorAdvantages.length >= 2 && analysisLocked) completed++;
     if (ksfDimensions.length >= 3 && ksfLocked) completed++;
     if (benchmarkScores.length >= 3) completed++;
+    if (swotLocked && swot.strengths.length > 0) completed++;
+    if (towsGenerated && strategicDirection) completed++;
+    if (matrixGenerated) completed++;
 
     return { completed, total, percentage: Math.round((completed / total) * 100) };
   };
@@ -462,7 +744,7 @@ export default function Step2Insight() {
             style={{ width: `${progress.percentage}%` }}
           />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 text-xs">
           <div className={`p-2 rounded text-center ${trends.trim() ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-slate-400'}`}>
             1. 行业趋势
           </div>
@@ -478,6 +760,12 @@ export default function Step2Insight() {
           <div className={`p-2 rounded text-center ${benchmarkScores.length >= 3 ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-slate-400'}`}>
             5. 竞争对标
           </div>
+          <div className={`p-2 rounded text-center ${swotLocked && swot.strengths.length > 0 ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-slate-400'}`}>
+            6. SWOT 分析
+          </div>
+          <div className={`p-2 rounded text-center ${towsGenerated && strategicDirection ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-gray-50 dark:bg-slate-700 text-gray-500 dark:text-slate-400'}`}>
+            7. TOWS 推演
+          </div>
         </div>
       </div>
 
@@ -486,7 +774,7 @@ export default function Step2Insight() {
           Step 2: 行业竞争力建模与对标
         </h2>
         <p className="text-gray-600 dark:text-slate-400">
-          客户洞察 → 竞对侦察 → KSF 提炼 → 竞争力对标 → SWOT 生成
+          数据收集 → 客户洞察 → 竞对侦察 → KSF 提炼 → 竞争对标 → SWOT 分析 → TOWS 推演 → 战略矩阵
         </p>
       </div>
 
@@ -931,6 +1219,126 @@ export default function Step2Insight() {
         </div>
       </div>
 
+      {/* ========== 洞察小结（新增）========== */}
+      <div className="mb-8">
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-500 text-white text-sm">1.5</span>
+          洞察小结 (SWOT 基础)
+        </h3>
+
+        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
+          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              💡 <strong>提示：</strong>这是基于您收集的行业、竞对、客户信息进行的人工总结或 AI 总结。这些内容将与后续的"竞争力对标推导"合并，生成最终的 SWOT 矩阵。
+            </p>
+          </div>
+
+          {/* AI 总结按钮 */}
+          <div className="flex justify-center mb-4">
+            <button
+              onClick={handleGenerateInsightSummary}
+              disabled={isGeneratingInsight}
+              className="px-6 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-400 text-white font-medium rounded-lg flex items-center gap-2 transition-all duration-200"
+            >
+              {isGeneratingInsight ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  AI 总结中...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  AI 洞察总结
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* 四个文本域 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 优势 S */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                优势 (Strengths)
+                <span className="ml-2 text-xs text-gray-500 dark:text-slate-400">
+                  我司的核心竞争力、资源优势
+                </span>
+              </label>
+              <textarea
+                value={insightSummary.strengths}
+                onChange={(e) => handleUpdateInsightSummary('strengths', e.target.value)}
+                placeholder="例如：行业领先的技术、强大的销售团队、品牌知名度..."
+                rows={5}
+                className="w-full px-3 py-2 border border-green-300 dark:border-green-700 rounded-lg
+                           bg-green-50 dark:bg-green-900/10 text-gray-900 dark:text-gray-100
+                           focus:outline-none focus:ring-2 focus:ring-green-500
+                           placeholder:text-gray-400 dark:placeholder:text-slate-500 resize-none text-sm"
+              />
+            </div>
+
+            {/* 劣势 W */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                劣势 (Weaknesses)
+                <span className="ml-2 text-xs text-gray-500 dark:text-slate-400">
+                  我司的短板、资源约束
+                </span>
+              </label>
+              <textarea
+                value={insightSummary.weaknesses}
+                onChange={(e) => handleUpdateInsightSummary('weaknesses', e.target.value)}
+                placeholder="例如：产能不足、技术研发滞后、资金紧张..."
+                rows={5}
+                className="w-full px-3 py-2 border border-red-300 dark:border-red-700 rounded-lg
+                           bg-red-50 dark:bg-red-900/10 text-gray-900 dark:text-gray-100
+                           focus:outline-none focus:ring-2 focus:ring-red-500
+                           placeholder:text-gray-400 dark:placeholder:text-slate-500 resize-none text-sm"
+              />
+            </div>
+
+            {/* 机会 O */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                机会 (Opportunities)
+                <span className="ml-2 text-xs text-gray-500 dark:text-slate-400">
+                  行业趋势中的增长点、政策红利
+                </span>
+              </label>
+              <textarea
+                value={insightSummary.opportunities}
+                onChange={(e) => handleUpdateInsightSummary('opportunities', e.target.value)}
+                placeholder="例如：新能源政策扶持、下游需求快速增长、出口市场开放..."
+                rows={5}
+                className="w-full px-3 py-2 border border-blue-300 dark:border-blue-700 rounded-lg
+                           bg-blue-50 dark:bg-blue-900/10 text-gray-900 dark:text-gray-100
+                           focus:outline-none focus:ring-2 focus:ring-blue-500
+                           placeholder:text-gray-400 dark:placeholder:text-slate-500 resize-none text-sm"
+              />
+            </div>
+
+            {/* 威胁 T */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                威胁 (Threats)
+                <span className="ml-2 text-xs text-gray-500 dark:text-slate-400">
+                  竞争压力、行业风险、政策变化
+                </span>
+              </label>
+              <textarea
+                value={insightSummary.threats}
+                onChange={(e) => handleUpdateInsightSummary('threats', e.target.value)}
+                placeholder="例如：竞对价格战、原材料价格上涨、环保法规趋严..."
+                rows={5}
+                className="w-full px-3 py-2 border border-yellow-300 dark:border-yellow-700 rounded-lg
+                           bg-yellow-50 dark:bg-yellow-900/10 text-gray-900 dark:text-gray-100
+                           focus:outline-none focus:ring-2 focus:ring-yellow-500
+                           placeholder:text-gray-400 dark:placeholder:text-slate-500 resize-none text-sm"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ========== 阶段 2: KSF 提炼（带推导理由） ========== */}
       <div className="mb-8">
         <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
@@ -1273,37 +1681,444 @@ export default function Step2Insight() {
           {swot.strengths.length > 0 && (
             <>
               <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6 mb-6">
-                <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                  SWOT 分析矩阵
-                </h4>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-semibold text-gray-900 dark:text-gray-100">
+                    SWOT 分析矩阵
+                  </h4>
+                  {!swotLocked && swot.strengths.length > 0 && (
+                    <button
+                      onClick={handleLockSwot}
+                      className="text-sm px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg flex items-center gap-2 transition-colors"
+                    >
+                      <Check className="w-4 h-4" />
+                      锁定编辑
+                    </button>
+                  )}
+                  {swotLocked && (
+                    <button
+                      onClick={() => setSwotLocked(false)}
+                      className="text-sm text-gray-600 dark:text-slate-400 hover:text-primary-500 flex items-center gap-2"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      解锁编辑
+                    </button>
+                  )}
+                </div>
+
+                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    💡 <strong>提示：</strong>优势/劣势基于对标分数自动计算（我司分 - 竞对分 ≥ 1 为优势，≤ -1 为劣势）。您可以手动添加、编辑或删除条目。
+                  </p>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <SwotSection title="优势 (Strengths)" color="green" items={swot.strengths} />
-                  <SwotSection title="劣势 (Weaknesses)" color="red" items={swot.weaknesses} />
-                  <SwotSection title="机会 (Opportunities)" color="blue" items={swot.opportunities} />
-                  <SwotSection title="威胁 (Threats)" color="yellow" items={swot.threats} />
+                  <SwotSection
+                    title="优势 (Strengths)"
+                    color="green"
+                    items={swot.strengths}
+                    onAdd={(item) => handleAddSwotItem('strengths', item)}
+                    onRemove={(index) => handleRemoveSwotItem('strengths', index)}
+                    onUpdate={(index, value) => handleUpdateSwotItem('strengths', index, value)}
+                    locked={swotLocked}
+                  />
+                  <SwotSection
+                    title="劣势 (Weaknesses)"
+                    color="red"
+                    items={swot.weaknesses}
+                    onAdd={(item) => handleAddSwotItem('weaknesses', item)}
+                    onRemove={(index) => handleRemoveSwotItem('weaknesses', index)}
+                    onUpdate={(index, value) => handleUpdateSwotItem('weaknesses', index, value)}
+                    locked={swotLocked}
+                  />
+                  <SwotSection
+                    title="机会 (Opportunities)"
+                    color="blue"
+                    items={swot.opportunities}
+                    onAdd={(item) => handleAddSwotItem('opportunities', item)}
+                    onRemove={(index) => handleRemoveSwotItem('opportunities', index)}
+                    onUpdate={(index, value) => handleUpdateSwotItem('opportunities', index, value)}
+                    locked={swotLocked}
+                  />
+                  <SwotSection
+                    title="威胁 (Threats)"
+                    color="yellow"
+                    items={swot.threats}
+                    onAdd={(item) => handleAddSwotItem('threats', item)}
+                    onRemove={(index) => handleRemoveSwotItem('threats', index)}
+                    onUpdate={(index, value) => handleUpdateSwotItem('threats', index, value)}
+                    locked={swotLocked}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ========== TOWS 交叉策略摘要（新增）========== */}
+          {towsGenerated && (
+            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-6 mb-6">
+              <div className="flex items-start gap-3 mb-4">
+                <Sparkles className="w-6 h-6 text-purple-500 flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">
+                    TOWS 交叉策略摘要
+                  </h4>
+                  <p className="text-xs text-purple-700 dark:text-purple-300 mb-3">
+                    💡 下方的策略组合由 AI 基于当前 SWOT 分析生成。您可以在此基础上进行人工修订、补充或总结。
+                  </p>
+
+                  {/* 可编辑的 TOWS 摘要 Textarea */}
+                  <textarea
+                    value={`${towsStrategies.so.map((s, i) => `[SO] ${s}`).join('\n')}\n\n${towsStrategies.wo.map((w, i) => `[WO] ${w}`).join('\n')}\n\n${towsStrategies.st.map((s, i) => `[ST] ${s}`).join('\n')}\n\n${towsStrategies.wt.map((w, i) => `[WT] ${w}`).join('\n')}`}
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      const lines = text.split('\n');
+                      const so: string[] = [];
+                      const wo: string[] = [];
+                      const st: string[] = [];
+                      const wt: string[] = [];
+                      let currentArray = so;
+
+                      lines.forEach(line => {
+                        const trimmed = line.trim();
+                        if (trimmed.startsWith('[SO]')) {
+                          currentArray = so;
+                          if (trimmed.length > 4) so.push(trimmed.substring(4).trim());
+                        } else if (trimmed.startsWith('[WO]')) {
+                          currentArray = wo;
+                          if (trimmed.length > 4) wo.push(trimmed.substring(4).trim());
+                        } else if (trimmed.startsWith('[ST]')) {
+                          currentArray = st;
+                          if (trimmed.length > 4) st.push(trimmed.substring(4).trim());
+                        } else if (trimmed.startsWith('[WT]')) {
+                          currentArray = wt;
+                          if (trimmed.length > 4) wt.push(trimmed.substring(4).trim());
+                        } else if (trimmed && currentArray) {
+                          currentArray.push(trimmed);
+                        }
+                      });
+
+                      setTowsStrategies({ so, wo, st, wt });
+                    }}
+                    className="w-full h-64 px-4 py-3 border border-purple-300 dark:border-purple-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="在此编辑 TOWS 策略摘要...
+
+格式示例：
+[SO] 利用技术领先优势拓展高端市场
+[SO] 发挥品牌优势把握政策红利
+
+[WO] 通过战略合作补齐产能短板
+[WO] 引入人才提升研发能力
+
+[ST] 发挥成本优势抵御价格战
+[ST] 强化客户关系抵御竞对冲击
+
+[WT] 收缩非核心业务降低风险
+[WT] 优化成本结构提升生存能力"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========== 阶段 5: TOWS 交叉策略推演（新增）========== */}
+      {swot.strengths.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-500 text-white text-sm">5</span>
+            SWOT 交叉策略推演（TOWS）
+          </h3>
+
+          {!towsGenerated ? (
+            <div className="flex justify-center mb-6">
+              <button
+                onClick={handleGenerateTOWS}
+                disabled={isGeneratingTows}
+                className="px-8 py-3 bg-purple-500 hover:bg-purple-600 disabled:bg-gray-400 text-white font-semibold rounded-lg flex items-center gap-2 transition-all duration-200"
+              >
+                {isGeneratingTows ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    生成中...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5" />
+                    生成 TOWS 交叉策略
+                  </>
+                )}
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* AI 战略基调建议 */}
+              {aiStrategicRecommendation && (
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-6 mb-6">
+                  <div className="flex items-start gap-3">
+                    <Lightbulb className="w-6 h-6 text-purple-500 flex-shrink-0 mt-1" />
+                    <div>
+                      <h4 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">
+                        AI 战略基调建议
+                      </h4>
+                      <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                        {aiStrategicRecommendation}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TOWS 矩阵 */}
+              <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6 mb-6">
+                <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                  TOWS 交叉策略矩阵
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* SO 策略 */}
+                  <div className="border-l-4 border-green-500 pl-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-semibold rounded">SO</span>
+                      <h5 className="font-medium text-gray-900 dark:text-gray-100">追击型（优势+机会）</h5>
+                    </div>
+                    <ul className="space-y-2">
+                      {towsStrategies.so.map((item, index) => (
+                        <li key={index} className="text-sm text-gray-700 dark:text-gray-300">
+                          • {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* WO 策略 */}
+                  <div className="border-l-4 border-blue-500 pl-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-semibold rounded">WO</span>
+                      <h5 className="font-medium text-gray-900 dark:text-gray-100">改进型（劣势+机会）</h5>
+                    </div>
+                    <ul className="space-y-2">
+                      {towsStrategies.wo.map((item, index) => (
+                        <li key={index} className="text-sm text-gray-700 dark:text-gray-300">
+                          • {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* ST 策略 */}
+                  <div className="border-l-4 border-yellow-500 pl-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 text-xs font-semibold rounded">ST</span>
+                      <h5 className="font-medium text-gray-900 dark:text-gray-100">防御型（优势+威胁）</h5>
+                    </div>
+                    <ul className="space-y-2">
+                      {towsStrategies.st.map((item, index) => (
+                        <li key={index} className="text-sm text-gray-700 dark:text-gray-300">
+                          • {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* WT 策略 */}
+                  <div className="border-l-4 border-red-500 pl-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs font-semibold rounded">WT</span>
+                      <h5 className="font-medium text-gray-900 dark:text-gray-100">止损型（劣势+威胁）</h5>
+                    </div>
+                    <ul className="space-y-2">
+                      {towsStrategies.wt.map((item, index) => (
+                        <li key={index} className="text-sm text-gray-700 dark:text-gray-300">
+                          • {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
               </div>
 
-              {strategicPoints.length > 0 && (
-                <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
-                  <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                    战略机会点
-                  </h4>
-                  <ul className="space-y-3">
-                    {strategicPoints.map((point, index) => (
-                      <li key={index} className="flex items-start gap-3 text-gray-700 dark:text-gray-300">
-                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 flex items-center justify-center text-sm font-medium mt-0.5">
-                          {index + 1}
-                        </span>
-                        <span className="flex-1">{point}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {/* 重新生成按钮 */}
+              <div className="text-center">
+                <button
+                  onClick={() => setTowsGenerated(false)}
+                  className="px-4 py-2 text-sm text-gray-600 dark:text-slate-400 hover:text-purple-500"
+                >
+                  重新分析 TOWS
+                </button>
+              </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* ========== 阶段 6: 战略方向决策（新增）========== */}
+      {towsGenerated && (
+        <div className="mb-8">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-500 text-white text-sm">6</span>
+            战略方向选择
+          </h3>
+
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
+            <p className="text-sm text-gray-600 dark:text-slate-400 mb-4">
+              请根据 TOWS 分析结果，选择企业的总体战略方向：
+            </p>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { id: 'expansion', name: '扩张型', desc: '积极进取，扩大市场份额', color: 'blue' },
+                { id: 'diversification', name: '多元化', desc: '多产品多市场，分散风险', color: 'purple' },
+                { id: 'stability', name: '稳定型', desc: '保持现状，巩固优势', color: 'green' },
+                { id: 'defensive', name: '收缩型', desc: '聚焦核心，减少投入', color: 'yellow' }
+              ].map(direction => {
+                const isSelected = strategicDirection === direction.id;
+                const colorClasses = {
+                  blue: 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30',
+                  purple: 'border-purple-500 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30',
+                  green: 'border-green-500 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30',
+                  yellow: 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30'
+                };
+                return (
+                  <button
+                    key={direction.id}
+                    onClick={() => handleSelectDirection(direction.id)}
+                    className={`p-4 border-2 rounded-lg transition-all text-left ${
+                      isSelected
+                        ? colorClasses[direction.color as keyof typeof colorClasses].replace('hover:', '').replace('/30', '/40')
+                        : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 hover:bg-gray-50 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    <div className={`font-semibold text-sm mb-1 ${isSelected ? 'text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-slate-400'}`}>
+                      {direction.name}
+                    </div>
+                    <div className={`text-xs ${isSelected ? 'text-gray-700 dark:text-gray-300' : 'text-gray-500 dark:text-slate-500'}`}>
+                      {direction.desc}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {strategicDirection && (
+              <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  ✅ 已选择战略方向：<strong>{strategicDirection === 'expansion' ? '扩张型' : strategicDirection === 'diversification' ? '多元化' : strategicDirection === 'stability' ? '稳定型' : '收缩型'}</strong>
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* 生成产品-客户矩阵按钮 */}
+          {strategicDirection && !matrixGenerated && (
+            <div className="flex justify-center mt-6">
+              <button
+                onClick={handleGenerateMatrix}
+                disabled={isGeneratingMatrix}
+                className="px-8 py-3 bg-indigo-500 hover:bg-indigo-600 disabled:bg-gray-400 text-white font-semibold rounded-lg flex items-center gap-2 transition-all duration-200"
+              >
+                {isGeneratingMatrix ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    生成中...
+                  </>
+                ) : (
+                  <>
+                    <BarChart3 className="w-5 h-5" />
+                    生成产品-客户矩阵
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========== 阶段 7: 产品-客户矩阵（新增）========== */}
+      {matrixGenerated && (
+        <div className="mb-8">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-pink-500 text-white text-sm">7</span>
+            产品-客户战略矩阵（安索夫矩阵）
+          </h3>
+
+          <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* 市场渗透：老客户+老产品 */}
+              <div className="border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-blue-50 dark:bg-blue-900/10">
+                <h4 className="font-semibold text-blue-700 dark:text-blue-300 mb-3 flex items-center gap-2">
+                  <span className="px-2 py-1 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 text-xs font-semibold rounded">老客户 + 老产品</span>
+                  市场渗透
+                </h4>
+                <ul className="space-y-2">
+                  {productCustomerMatrix.marketPenetration.map((item, index) => (
+                    <li key={index} className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                      <span className="text-blue-500 font-semibold">{index + 1}.</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* 产品开发：老客户+新产品 */}
+              <div className="border-2 border-purple-200 dark:border-purple-800 rounded-lg p-4 bg-purple-50 dark:bg-purple-900/10">
+                <h4 className="font-semibold text-purple-700 dark:text-purple-300 mb-3 flex items-center gap-2">
+                  <span className="px-2 py-1 bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200 text-xs font-semibold rounded">老客户 + 新产品</span>
+                  产品开发
+                </h4>
+                <ul className="space-y-2">
+                  {productCustomerMatrix.productDevelopment.map((item, index) => (
+                    <li key={index} className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                      <span className="text-purple-500 font-semibold">{index + 1}.</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* 市场开发：新客户+老产品 */}
+              <div className="border-2 border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50 dark:bg-green-900/10">
+                <h4 className="font-semibold text-green-700 dark:text-green-300 mb-3 flex items-center gap-2">
+                  <span className="px-2 py-1 bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 text-xs font-semibold rounded">新客户 + 老产品</span>
+                  市场开发
+                </h4>
+                <ul className="space-y-2">
+                  {productCustomerMatrix.marketDevelopment.map((item, index) => (
+                    <li key={index} className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                      <span className="text-green-500 font-semibold">{index + 1}.</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* 多元化：新客户+新产品 */}
+              <div className="border-2 border-pink-200 dark:border-pink-800 rounded-lg p-4 bg-pink-50 dark:bg-pink-900/10">
+                <h4 className="font-semibold text-pink-700 dark:text-pink-300 mb-3 flex items-center gap-2">
+                  <span className="px-2 py-1 bg-pink-200 dark:bg-pink-800 text-pink-800 dark:text-pink-200 text-xs font-semibold rounded">新客户 + 新产品</span>
+                  多元化
+                </h4>
+                <ul className="space-y-2">
+                  {productCustomerMatrix.diversification.map((item, index) => (
+                    <li key={index} className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                      <span className="text-pink-500 font-semibold">{index + 1}.</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* 重新生成按钮 */}
+            <div className="text-center mt-6">
+              <button
+                onClick={() => setMatrixGenerated(false)}
+                className="px-4 py-2 text-sm text-gray-600 dark:text-slate-400 hover:text-pink-500"
+              >
+                重新生成产品-客户矩阵
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1341,11 +2156,19 @@ export default function Step2Insight() {
 function SwotSection({
   title,
   color,
-  items
+  items,
+  onAdd,
+  onRemove,
+  onUpdate,
+  locked
 }: {
   title: string;
   color: 'green' | 'red' | 'blue' | 'yellow';
   items: string[];
+  onAdd?: (item: string) => void;
+  onRemove?: (index: number) => void;
+  onUpdate?: (index: number, value: string) => void;
+  locked?: boolean;
 }) {
   const colorClasses = {
     green: 'border-green-500 bg-green-50 dark:bg-green-900/20',
@@ -1354,15 +2177,94 @@ function SwotSection({
     yellow: 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20',
   };
 
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  const handleStartEdit = (index: number, item: string) => {
+    setEditingIndex(index);
+    setEditValue(item);
+  };
+
+  const handleSaveEdit = (index: number) => {
+    if (onUpdate && editValue.trim()) {
+      onUpdate(index, editValue.trim());
+    }
+    setEditingIndex(null);
+    setEditValue('');
+  };
+
+  const handleAddNewItem = () => {
+    const newItem = prompt('请输入新的条目:');
+    if (newItem && onAdd) {
+      onAdd(newItem.trim());
+    }
+  };
+
   return (
     <div className={`border-l-4 p-4 rounded-r-lg ${colorClasses[color]}`}>
-      <h4 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">{title}</h4>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-semibold text-gray-900 dark:text-gray-100">{title}</h4>
+        {!locked && (
+          <button
+            onClick={handleAddNewItem}
+            className="text-xs px-2 py-1 bg-white dark:bg-slate-700 rounded hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors"
+            title="添加新条目"
+          >
+            + 添加
+          </button>
+        )}
+      </div>
       <ul className="space-y-2">
         {items.map((item, index) => (
-          <li key={index} className="text-sm text-gray-700 dark:text-gray-300">
-            • {item}
+          <li key={index} className="flex items-start gap-2 group">
+            {editingIndex === index ? (
+              <>
+                <input
+                  type="text"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSaveEdit(index)}
+                  onBlur={() => handleSaveEdit(index)}
+                  className={`flex-1 px-2 py-1 text-sm rounded border-2 ${colorClasses[color].split(' ').filter(c => c.includes('border-')).join(' ')}`}
+                  autoFocus
+                />
+                <button
+                  onClick={() => handleSaveEdit(index)}
+                  className="text-green-500 hover:text-green-600"
+                >
+                  <Check className="w-4 h-4" />
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">• {item}</span>
+                {!locked && (
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => handleStartEdit(index, item)}
+                      className="text-gray-400 hover:text-blue-500"
+                      title="编辑"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => onRemove && onRemove(index)}
+                      className="text-gray-400 hover:text-red-500"
+                      title="删除"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </li>
         ))}
+        {items.length === 0 && (
+          <li className="text-sm text-gray-400 dark:text-slate-500 italic">
+            暂无内容
+          </li>
+        )}
       </ul>
     </div>
   );
