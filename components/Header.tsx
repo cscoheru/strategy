@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
 import { useStore } from '@/lib/store';
+import { isSupabaseConfigured } from '@/lib/supabase';
 import {
   Settings as SettingsIcon,
   LogIn,
   LogOut,
   User,
-  Loader2
+  Loader2,
+  CloudOff
 } from 'lucide-react';
 
 export default function Header() {
@@ -29,6 +31,9 @@ export default function Header() {
     }
   };
 
+  // 检查是否是生产环境且 Supabase 未配置
+  const isProdWithoutSupabase = process.env.NODE_ENV === 'production' && !isSupabaseConfigured;
+
   return (
     <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -44,6 +49,18 @@ export default function Header() {
             )}
           </div>
           <div className="flex items-center gap-3">
+            {/* Supabase 未配置提示（仅生产环境） */}
+            {isProdWithoutSupabase && (
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5
+                               bg-yellow-50 dark:bg-yellow-900/20
+                               border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <CloudOff className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                <span className="text-xs text-yellow-700 dark:text-yellow-300">
+                  云端服务未配置
+                </span>
+              </div>
+            )}
+
             {/* 登录状态 */}
             {isLoggedIn ? (
               <div className="flex items-center gap-3">
@@ -76,9 +93,12 @@ export default function Header() {
             ) : (
               <button
                 onClick={() => router.push('/login')}
-                className="flex items-center gap-2 px-4 py-1.5 bg-primary-500 hover:bg-primary-600
+                disabled={!isSupabaseConfigured}
+                className="flex items-center gap-2 px-4 py-1.5
+                           bg-primary-500 hover:bg-primary-600 disabled:bg-gray-400 disabled:cursor-not-allowed
                            text-white rounded-lg text-sm font-medium
                            transition-all duration-200"
+                title={!isSupabaseConfigured ? '云端服务未配置，请联系管理员' : '登录'}
               >
                 <LogIn className="w-4 h-4" />
                 <span>登录</span>

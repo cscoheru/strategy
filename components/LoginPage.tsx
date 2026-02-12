@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
-import { authHelpers } from '@/lib/supabase';
+import { authHelpers, isSupabaseConfigured } from '@/lib/supabase';
 import {
   Mail,
   Lock,
@@ -12,7 +12,9 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  CloudOff,
+  Home
 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -29,6 +31,7 @@ export default function LoginPage() {
   // 检查是否已登录
   useEffect(() => {
     const checkAuth = async () => {
+      if (!isSupabaseConfigured) return;
       const user = await authHelpers.getCurrentUser();
       if (user) {
         await login(user.id, user.email || '');
@@ -37,6 +40,34 @@ export default function LoginPage() {
     };
     checkAuth();
   }, []);
+
+  // 如果 Supabase 未配置，显示提示
+  if (!isSupabaseConfigured) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-2xl mb-6">
+            <CloudOff className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
+            云端服务未配置
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            当前环境未配置云端数据库，仅支持本地试用模式。<br />
+            数据将保存在浏览器中，清除浏览器数据后会丢失。
+          </p>
+          <button
+            onClick={() => router.push('/')}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-primary-500 hover:bg-primary-600
+                       text-white rounded-lg font-medium transition-all duration-200"
+          >
+            <Home className="w-5 h-5" />
+            返回首页（试用模式）
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,22 +87,31 @@ export default function LoginPage() {
       } else {
         // 注册
         const result = await authHelpers.signUpWithEmail(email, password);
-        if (result.error || !result.data?.user) {
-          throw new Error(result.error?.message || '注册失败，请重试');
+        if (result.error) {
+          // 检查是否是用户已存在错误
+          if (result.error.message.includes('already been registered')) {
+            setError('该邮箱已被注册，请直接登录');
+          } else {
+            throw new Error(result.error?.message || '注册失败，请重试');
+          }
+        } else if (result.data?.user) {
+          // 注册成功，自动登录
+          await login(result.data.user.id, email);
+          router.push('/');
+        } else {
+          throw new Error('注册失败，请重试');
         }
-
-        // 注册成功，自动登录
-        await login(result.data.user.id, email);
-        router.push('/');
       }
     } catch (err: any) {
       console.error('Auth error:', err);
-      if (err.message?.includes('Invalid login')) {
+      if (err.message?.includes('Invalid login') || err.message?.includes('invalid_credentials')) {
         setError('邮箱或密码错误');
-      } else if (err.message?.includes('User already registered')) {
+      } else if (err.message?.includes('User already registered') || err.message?.includes('already been registered')) {
         setError('该邮箱已被注册，请直接登录');
-      } else if (err.message?.includes('Email not confirmed')) {
+      } else if (err.message?.includes('Email not confirmed') || err.message?.includes('Email not verified')) {
         setError('请先验证邮箱');
+      } else if (err.message?.includes('Supabase not configured')) {
+        setError('云端服务未配置，当前仅支持本地试用模式。请刷新页面使用试用模式。');
       } else {
         setError(err.message || '操作失败，请稍后重试');
       }

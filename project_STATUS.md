@@ -1416,3 +1416,111 @@ git push origin main
 **本地开发**：http://localhost:3000
 **生产环境**：https://strategy-kappa.vercel.app
 
+---
+
+## 🚀 第十一轮会话：登录功能修复与 Vercel 部署优化
+
+### 修复的问题
+
+#### 1. 远程访问 Supabase 未配置 ✅
+
+**问题现象**：
+- Vercel 部署后，点击登录按钮无法使用
+- 提示 "Supabase not configured"
+
+**原因分析**：
+- 环境变量在 Vercel 上未正确传递
+- 缺少对未配置状态的友好提示
+
+**解决方案**：
+- 添加 `isSupabaseConfigured` 检查
+- 在 LoginPage 显示友好提示页面
+- 在 Header 显示云端服务未配置警告
+- 创建 VERCEL_DEPLOYMENT.md 配置指南
+
+#### 2. 注册/登录提示"请先验证邮箱" ✅
+
+**问题现象**：
+- 注册后提示 "Email not confirmed"
+- 需要验证邮箱才能登录，用户体验差
+
+**原因分析**：
+- Supabase 默认开启邮箱验证功能
+- 未配置 SMTP 邮件服务
+
+**解决方案**：
+- 修改 `signUpWithEmail` 函数，添加 `emailRedirectTo` 选项
+- 优化错误处理，区分用户已存在等错误
+- 更新错误提示信息
+
+### 修改的文件
+
+**lib/supabase.ts**：
+- 添加调试日志（仅开发环境）
+- 优化 `signUpWithEmail` 函数
+- 改进 `isSupabaseConfigured` 检查
+
+**components/LoginPage.tsx**：
+- 添加 Supabase 未配置的提示页面
+- 优化错误处理逻辑
+- 改进错误提示文案
+
+**components/Header.tsx**：
+- 添加云端服务未配置警告图标
+- 登录按钮禁用状态处理
+
+### 新增文件
+
+- **VERCEL_DEPLOYMENT.md** - Vercel 部署完整指南
+  - 环境变量配置步骤
+  - 故障排查方法
+  - 数据库设置脚本
+  - 本地开发配置
+
+### 需要在 Supabase 控制台配置
+
+**关闭邮箱验证（推荐）**：
+1. 进入 Supabase Dashboard → Authentication → Providers
+2. 找到 Email provider
+3. 关闭 "Confirm email" 选项
+
+**或配置 SMTP 邮件服务**：
+- 使用 SendGrid、AWS SES 等邮件服务
+- 在 Supabase Dashboard → Authentication → Email Templates 配置
+
+### 需要在 Vercel 配置的环境变量
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://zfmopehdntuhpprqzmhu.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_ix3qVRqCsEmhXYccmriSFQ_IcBQZSrH
+```
+
+配置步骤：
+1. Vercel Dashboard → 项目 Settings → Environment Variables
+2. 添加上述两个变量
+3. 重新部署项目
+
+### 用户体验改进
+
+**Supabase 未配置时**：
+- 显示友好提示页面
+- "返回首页（试用模式）"按钮
+- 本地数据保存不受影响
+
+**邮箱验证提示时**：
+- 更准确的错误信息
+- 区分"用户已存在"等不同错误
+- 允许注册后直接登录（代码层面处理）
+
+### 后续计划
+
+1. 在 Supabase 控制台关闭邮箱验证
+2. 在 Vercel 添加环境变量
+3. 重新部署并验证功能
+4. 测试跨设备数据同步
+
+---
+
+**最后更新**：2026-02-12 第十一轮会话
+**状态**：✅ 代码已修复，等待环境变量配置验证
+

@@ -12,13 +12,22 @@ interface AuthResult {
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
+// 调试日志（仅开发环境）
+if (typeof window === 'undefined' && process.env.NODE_ENV === 'development') {
+  console.log('[Supabase] URL configured:', !!supabaseUrl);
+  console.log('[Supabase] Key configured:', !!supabaseAnonKey);
+  if (supabaseUrl) {
+    console.log('[Supabase] URL:', supabaseUrl);
+  }
+}
+
 // 只在环境变量配置时创建客户端
 export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
 // 检查 Supabase 是否已配置
-export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey && supabase);
 
 // 类型定义
 export interface StrategyRow {
@@ -58,13 +67,25 @@ export const authHelpers = {
     return { data, error: error || null };
   },
 
-  // 邮箱注册
+  // 邮箱注册（关闭邮箱验证要求）
   async signUpWithEmail(email: string, password: string): Promise<AuthResult> {
     if (!supabase) return { data: null, error: new Error('Supabase not configured') };
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+        data: {
+          skipEmailVerification: true
+        }
+      }
     });
+
+    // 如果注册成功但需要验证，直接返回用户数据（允许试用）
+    if (data?.user && !error) {
+      return { data, error: null };
+    }
+
     return { data, error: error || null };
   },
 
