@@ -41,6 +41,12 @@ export default function Step3Target() {
   const strategicDirection = step2Data?.strategicDirection || '未选择';
   const productMatrix = step2Data?.productCustomerMatrix || null;
 
+  // ========== TOWS 策略（从 Step 2 读取）==========
+  const towsStrategies = step2Data?.towsStrategies || { so: [], wo: [], st: [], wt: [] };
+  const [towsSummary, setTowsSummary] = useState(
+    `${towsStrategies.so.map((s, i) => `[SO] ${s}`).join('\n')}\n\n${towsStrategies.wo.map((w, i) => `[WO] ${w}`).join('\n')}\n\n${towsStrategies.st.map((s, i) => `[ST] ${s}`).join('\n')}\n\n${towsStrategies.wt.map((w, i) => `[WT] ${w}`).join('\n')}`
+  );
+
   // ========== 矩阵数据状态 ==========
   const [matrixData, setMatrixData] = useState<MatrixData>(() => {
     // 尝试从 Step3 恢复数据
@@ -333,6 +339,30 @@ export default function Step3Target() {
               </div>
             </div>
 
+            {/* TOWS 交叉策略摘要（新增）========== */}
+            {towsStrategies.so.length > 0 && (
+              <div className="mt-4 p-4 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                <div className="flex items-start gap-3 mb-3">
+                  <Sparkles className="w-5 h-5 text-purple-500 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-1 text-sm">
+                      TOWS 交叉策略摘要（来自 Step 2）
+                    </h3>
+                    <p className="text-xs text-purple-700 dark:text-purple-300">
+                      💡 下方展示 AI 生成的 SO/WO/ST/WT 四类交叉策略。您可以在此基础上进行人工修订和总结。
+                    </p>
+                  </div>
+                </div>
+                <textarea
+                  value={towsSummary}
+                  onChange={(e) => setTowsSummary(e.target.value)}
+                  className="w-full h-48 px-3 py-2 text-sm border border-purple-300 dark:border-purple-700 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="TOWS 策略摘要..."
+                />
+              </div>
+            )}
+          </div>
+
             {/* 战略方向 */}
             <div>
               <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center gap-2">
@@ -352,7 +382,6 @@ export default function Step3Target() {
                   </p>
                 )}
               </div>
-            </div>
           </div>
         </div>
       </div>
