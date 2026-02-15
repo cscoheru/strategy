@@ -96,6 +96,30 @@ export const authHelpers = {
     return { error };
   },
 
+  // 重置密码
+  async resetPassword(email: string): Promise<{ data: null; error: Error | null }> {
+    if (!supabase) return { data: null, error: new Error('Supabase not configured') };
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: typeof window !== 'undefined'
+        ? `${window.location.origin}/login?reset=true`
+        : undefined,
+    });
+
+    return { data: null, error: error || null };
+  },
+
+  // 更新密码
+  async updatePassword(newPassword: string): Promise<{ data: null; error: Error | null }> {
+    if (!supabase) return { data: null, error: new Error('Supabase not configured') };
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    return { data: null, error: error || null };
+  },
+
   // 监听认证状态变化
   onAuthStateChange(callback: (event: string, session: any) => void) {
     if (!supabase) return { data: { subscription: null } };

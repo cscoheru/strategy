@@ -1447,3 +1447,775 @@ ${strategicDirection}
     ]
   };
 }
+
+/**
+ * Step 4: 生成 BSC 战略地图卡片
+ * 基于 Step 2 的 SWOT 和 TOWS 分析，生成平衡计分卡四象限内容
+ */
+export async function generateBSCCards(
+  apiKey: string,
+  swot: {
+    strengths: string[];
+    weaknesses: string[];
+    opportunities: string[];
+    threats: string[];
+  },
+  towsStrategies?: {
+    so: string[];
+    wo: string[];
+    st: string[];
+    wt: string[];
+  },
+  strategicDirection?: string
+): Promise<{
+  financial: { description: string; items: string[] };
+  customer: { description: string; items: string[] };
+  internalProcess: { description: string; items: string[] };
+  learningGrowth: { description: string; items: string[] };
+}> {
+  const messages: ZhipuMessage[] = [
+    {
+      role: 'system',
+      content: `你是一位资深的战略规划专家，擅长使用平衡计分卡（Balanced Scorecard, BSC）将战略目标转化为可视化的战略地图。
+
+**BSC 四象限说明**：
+1. **财务层面**：我们要如何满足股东期望？
+   - 关注：营收增长、利润率、ROI、资产回报率
+   - 指标：营收、利润、现金流、资产周转率
+
+2. **客户层面**：我们要如何满足客户期望？
+   - 关注：客户满意度、市场份额、客户忠诚度
+   - 指标：客户保留率、NPS、市场份额、客户获取成本
+
+3. **内部流程层面**：我们要在哪些业务流程上做到卓越？
+   - 关注：运营效率、创新能力、流程优化
+   - 指标：生产周期、次品率、流程效率、响应速度
+
+4. **学习与成长层面**：我们要如何保持持续改进和创造价值的能力？
+   - 关注：人才发展、组织文化、创新能力
+   - 指标：员工满意度、培训覆盖率、创新项目数、员工流失率
+
+**输出要求**：
+- 每个象限包含：描述性标题（1句话）+ 3-5个关键战略目标
+- 基于用户的 SWOT 和 TOWS 分析结果
+- 确保四个象限之间有因果逻辑关系（学习成长 → 内部流程 → 客户 → 财务）`
+    },
+    {
+      role: 'user',
+      content: `请基于以下 SWOT 和 TOWS 分析，生成 BSC 战略地图四象限内容：
+
+**战略方向**：
+${strategicDirection || '未明确'}
+
+**SWOT 分析**：
+优势 (S)：${swot.strengths.join('、')}
+劣势 (W)：${swot.weaknesses.join('、')}
+机会 (O)：${swot.opportunities.join('、')}
+威胁 (T)：${swot.threats.join('、')}
+
+${towsStrategies ? `**TOWS 交叉策略**：
+SO 策略（优势-机会）：${towsStrategies.so.join('；')}
+WO 策略（劣势-机会）：${towsStrategies.wo.join('；')}
+ST 策略（优势-威胁）：${towsStrategies.st.join('；')}
+WT 策略（劣势-威胁）：${towsStrategies.wt.join('；')}` : ''}
+
+请以 JSON 格式返回：
+{
+  "financial": {
+    "description": "财务层面的战略描述（1句话，15-30字）",
+    "items": ["财务目标1", "财务目标2", "财务目标3", "财务目标4"]
+  },
+  "customer": {
+    "description": "客户层面的战略描述（1句话，15-30字）",
+    "items": ["客户目标1", "客户目标2", "客户目标3", "客户目标4"]
+  },
+  "internalProcess": {
+    "description": "内部流程层面的战略描述（1句话，15-30字）",
+    "items": ["流程目标1", "流程目标2", "流程目标3", "流程目标4"]
+  },
+  "learningGrowth": {
+    "description": "学习与成长层面的战略描述（1句话，15-30字）",
+    "items": ["学习目标1", "学习目标2", "学习目标3", "学习目标4"]
+  }
+}
+
+**要求**：
+- 每个象限至少 3-5 个关键目标
+- 目标要具体可衡量，避免泛泛而谈
+- 四个象限之间要有因果逻辑链
+- 基于用户的 SWOT 和 TOWS 分析结果`
+    }
+  ];
+
+  const response = await callZhipuAPI(apiKey, messages);
+
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        financial: {
+          description: parsed.financial?.description || '提升财务绩效',
+          items: parsed.financial?.items || ['增加营收', '提高利润率']
+        },
+        customer: {
+          description: parsed.customer?.description || '提升客户价值',
+          items: parsed.customer?.items || ['提高客户满意度', '扩大市场份额']
+        },
+        internalProcess: {
+          description: parsed.internalProcess?.description || '优化运营效率',
+          items: parsed.internalProcess?.items || ['提高生产效率', '优化流程']
+        },
+        learningGrowth: {
+          description: parsed.learningGrowth?.description || '培养组织能力',
+          items: parsed.learningGrowth?.items || ['加强人才培养', '提升创新能力']
+        }
+      };
+    }
+  } catch (e) {
+    console.error('解析 BSC 卡片 JSON 失败:', e);
+  }
+
+  // 返回默认 BSC 结构
+  return {
+    financial: {
+      description: '提升财务绩效，实现可持续增长',
+      items: ['增加营收规模', '提高利润率', '优化现金流', '提升资产回报率']
+    },
+    customer: {
+      description: '提升客户价值，增强市场竞争力',
+      items: ['提高客户满意度', '扩大市场份额', '降低客户流失率', '提升品牌影响力']
+    },
+    internalProcess: {
+      description: '优化内部流程，提升运营效率',
+      items: ['提高生产效率', '优化产品质量', '缩短交付周期', '降低运营成本']
+    },
+    learningGrowth: {
+      description: '培养组织能力，支撑持续发展',
+      items: ['加强人才培养', '提升创新能力', '优化组织文化', '完善激励机制']
+    }
+  };
+}
+
+/**
+ * Step 4: AI 智能映射 - 将 BSC 战略地图映射到 3力3平台行动计划表
+ * 基于用户确认的 BSC 四象限内容，智能填充表格的后 6 列
+ */
+export async function mapBSCToActionPlan(
+  apiKey: string,
+  bscCards: {
+    financial: { description: string; items: string[] };
+    customer: { description: string; items: string[] };
+    internalProcess: { description: string; items: string[] };
+    learningGrowth: { description: string; items: string[] };
+  },
+  actionPlanRows: Array<{
+    seqNumber: number;
+    customerGroup: string;
+    product: string;
+    revenueTarget: number;
+  }>
+): Promise<{
+  salesForce: Record<number, string>;
+  productForce: Record<number, string>;
+  deliveryForce: Record<number, string>;
+  hr: Record<number, string>;
+  financeAssets: Record<number, string>;
+  digitalProcess: Record<number, string>;
+}> {
+  const messages: ZhipuMessage[] = [
+    {
+      role: 'system',
+      content: `你是一位资深的战略执行专家，擅长将战略地图（BSC 平衡计分卡）转化为可执行的行动计划。
+
+**任务目标**：
+将用户已确认的 BSC（平衡计分卡）四象限内容，智能映射填充到"3力3平台战略行动计划表"的后 6 列（3力+3平台）。
+
+**BSC 四象限说明**：
+1. **财务层面**：关注财务目标、ROI、营收增长
+2. **客户层面**：关注客户满意度、市场份额、客户关系
+3. **内部流程层面**：关注运营效率、流程优化、协同能力
+4. **学习与成长层面**：关注人才培养、创新能力、组织学习
+
+**表格结构**：
+- 前 4 列：序号、客户群、产品、营收目标（只读，来自 Step 3）
+- 后 6 列：销售力、产品力、交付力、人力、财务&资产、数字化&流程（可编辑，你需要填充）
+
+**映射规则**：
+- **财务层面**卡片的描述 → 财务&资产列
+- **客户层面**卡片的描述 → 根据内容判断：
+  * 提到"渠道"、"关系"、"拓展" → 分入【销售力】列
+  * 提到"性能"、"质量"、"研发"、"创新" → 分入【产品力】列
+  * 提到"响应"、"物流"、"交付"、"服务" → 分入【交付力】列
+- **内部流程层面**卡片的描述 → 人力列
+- **学习与成长层面**卡片的描述 → 数字化&流程列
+
+**重要约束**：
+- 如果描述涉及多个维度，优先填入最相关的列
+- 保持语言简洁、可执行（每条1-2句话）
+- 避免空值，如果无法判断就填入"待分析"
+
+请为每一行生成对应列的策略内容，以 JSON 格式返回。`
+    },
+    {
+      role: 'user',
+      content: `请根据以下 BSC 战略地图和行动计划表数据，智能填充后 6 列：
+
+**BSC 四象限内容**：
+
+【财务层面】
+描述：${bscCards.financial.description}
+项目：${bscCards.financial.items.join('、')}
+
+【客户层面】
+描述：${bscCards.customer.description}
+项目：${bscCards.customer.items.join('、')}
+
+【内部流程层面】
+描述：${bscCards.internalProcess.description}
+项目：${bscCards.internalProcess.items.join('、')}
+
+【学习与成长层面】
+描述：${bscCards.learningGrowth.description}
+项目：${bscCards.learningGrowth.items.join('、')}
+
+**行动计划表（当前数据）**：
+${actionPlanRows.map((row, idx) => `
+第 ${row.seqNumber} 行：
+- 客户群：${row.customerGroup}
+- 产品：${row.product}
+- 营收目标：${row.revenueTarget}万元
+`).join('\n')}
+
+请为每一行生成对应的6列策略内容，以JSON格式返回：
+{
+  "salesForce": {
+    "0": "第0行的销售力策略",
+    "1": "第1行的销售力策略"
+  },
+  "productForce": {
+    "0": "第0行的产品力策略",
+    "1": "第1行的产品力策略"
+  },
+  "deliveryForce": {
+    "0": "第0行的交付力策略",
+    "1": "第1行的交付力策略"
+  },
+  "hr": {
+    "0": "第0行的人力策略",
+    "1": "第1行的人力策略"
+  },
+  "financeAssets": {
+    "0": "第0行的财务&资产策略",
+    "1": "第1行的财务&资产策略"
+  },
+  "digitalProcess": {
+    "0": "第0行的数字化&流程策略",
+    "1": "第1行的数字化&流程策略"
+  }
+}
+
+**要求**：
+- 每个策略1-2句话，具体可执行
+- 优先匹配最相关的维度
+- 保持与BSC内容一致
+- 避免空值，无法判断时填"-"`
+    }
+  ];
+
+  const response = await callZhipuAPI(apiKey, messages);
+
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const mapped = JSON.parse(jsonMatch[0]);
+      return {
+        salesForce: mapped.salesForce || {},
+        productForce: mapped.productForce || {},
+        deliveryForce: mapped.deliveryForce || {},
+        hr: mapped.hr || {},
+        financeAssets: mapped.financeAssets || {},
+        digitalProcess: mapped.digitalProcess || {}
+      };
+    }
+  } catch (e) {
+    console.error('解析 BSC 映射 JSON 失败:', e);
+  }
+
+  // 返回默认映射（如果解析失败）
+  return {
+    salesForce: {},
+    productForce: {},
+    deliveryForce: {},
+    hr: {},
+    financeAssets: {},
+    digitalProcess: {}
+  };
+}
+
+/**
+ * Step 4: 生成聚焦式战略地图（重构版）
+ * 采用"倒推法"思维链，基于 Step 1-3 上下文智能判断战略主题
+ */
+export async function generateStrategyMap(
+  apiKey: string,
+  step1RootCause: string,
+  step2Swot: {
+    strengths: string[];
+    weaknesses: string[];
+    opportunities: string[];
+    threats: string[];
+  },
+  step2TowsStrategies?: {
+    so: string[];
+    wo: string[];
+    st: string[];
+    wt: string[];
+  },
+  step3MatrixData?: {
+    oldClients: string[];
+    newClients: string[];
+    oldProducts: string[];
+    newProducts: string[];
+    values: { [key: string]: number };
+  },
+  step3TargetAmount?: number
+): Promise<{
+  theme: 'product-leadership' | 'customer-intimacy' | 'operational-excellence';
+  themeDescription: string;
+  targetAmount: number;
+  layers: {
+    financial: Array<{
+      id: string;
+      layer: 'financial';
+      number: number;
+      title: string;
+      description: string;
+      items: string[];
+      parentCardIds: string[];
+      childCardIds: string[];
+      isHighlighted: boolean;
+      isEditable: boolean;
+    }>;
+    customer: Array<{
+      id: string;
+      layer: 'customer';
+      number: number;
+      title: string;
+      description: string;
+      items: string[];
+      parentCardIds: string[];
+      childCardIds: string[];
+      isHighlighted: boolean;
+      isEditable: boolean;
+    }>;
+    process: Array<{
+      id: string;
+      layer: 'process';
+      number: number;
+      title: string;
+      description: string;
+      items: string[];
+      parentCardIds: string[];
+      childCardIds: string[];
+      isHighlighted: boolean;
+      isEditable: boolean;
+    }>;
+    learning: Array<{
+      id: string;
+      layer: 'learning';
+      number: number;
+      title: string;
+      description: string;
+      items: string[];
+      parentCardIds: string[];
+      childCardIds: string[];
+      isHighlighted: boolean;
+      isEditable: boolean;
+    }>;
+  };
+  confirmed: boolean;
+}> {
+  // 第一步：分析增长来源，判断战略主题
+  let theme: 'product-leadership' | 'customer-intimacy' | 'operational-excellence' = 'operational-excellence';
+  let themeDescription = '卓越运营：重点在降本增效';
+  let growthAnalysis = '';
+
+  if (step3MatrixData) {
+    let newProductRevenue = 0;     // 新产品收入
+    let newCustomerRevenue = 0;    // 新客户收入
+    let existingCustomerDeepDive = 0; // 老客户深挖收入
+
+    // 计算新产品收入
+    for (const client of [...step3MatrixData.oldClients, ...step3MatrixData.newClients]) {
+      for (const product of step3MatrixData.newProducts) {
+        newProductRevenue += step3MatrixData.values[`${client}_${product}`] || 0;
+      }
+    }
+
+    // 计算新客户收入
+    for (const client of step3MatrixData.newClients) {
+      for (const product of [...step3MatrixData.oldProducts, ...step3MatrixData.newProducts]) {
+        newCustomerRevenue += step3MatrixData.values[`${client}_${product}`] || 0;
+      }
+    }
+
+    // 计算老客户深挖（老客户+老产品）
+    for (const client of step3MatrixData.oldClients) {
+      for (const product of step3MatrixData.oldProducts) {
+        existingCustomerDeepDive += step3MatrixData.values[`${client}_${product}`] || 0;
+      }
+    }
+
+    // 判断战略主题
+    if (newProductRevenue > existingCustomerDeepDive * 1.3) {
+      theme = 'product-leadership';
+      themeDescription = '产品领先：重点在研发创新，打造差异化产品';
+      growthAnalysis = `主要增长来自新产品（¥${newProductRevenue}万），战略重心应放在产品创新和研发能力上。`;
+    } else if (newCustomerRevenue > existingCustomerDeepDive * 1.3) {
+      theme = 'customer-intimacy';
+      themeDescription = '客户亲密：重点在服务体验，深化客户关系';
+      growthAnalysis = `主要增长来自新客户获取（¥${newCustomerRevenue}万），战略重心应放在客户获客和服务体验上。`;
+    } else {
+      // 检查是否有成本相关的核心短板
+      const rootCauseLower = step1RootCause.toLowerCase();
+      if (rootCauseLower.includes('成本') || rootCauseLower.includes('效率') || rootCauseLower.includes('费用') || rootCauseLower.includes('利润')) {
+        theme = 'operational-excellence';
+        themeDescription = '卓越运营：重点在降本增效，提升运营效率';
+        growthAnalysis = `核心短板与成本/效率相关，且主要收入来自现有客户（¥${existingCustomerDeepDive}万），战略重心应放在提升运营效率和降低成本上。`;
+      } else {
+        // 默认：根据最大增长来源决定
+        const maxRevenue = Math.max(newProductRevenue, newCustomerRevenue, existingCustomerDeepDive);
+        if (maxRevenue === newProductRevenue) {
+          theme = 'product-leadership';
+          themeDescription = '产品领先：重点在研发创新，打造差异化产品';
+          growthAnalysis = `主要收入来自新产品（¥${newProductRevenue}万），战略重心应放在产品创新上。`;
+        } else if (maxRevenue === newCustomerRevenue) {
+          theme = 'customer-intimacy';
+          themeDescription = '客户亲密：重点在服务体验，深化客户关系';
+          growthAnalysis = `主要收入来自新客户（¥${newCustomerRevenue}万），战略重心应放在客户关系上。`;
+        } else {
+          theme = 'operational-excellence';
+          themeDescription = '卓越运营：重点在降本增效，深耕现有客户';
+          growthAnalysis = `主要收入来自现有客户深挖（¥${existingCustomerDeepDive}万），战略重心应放在提升客户满意度和运营效率上。`;
+        }
+      }
+    }
+  }
+
+  const messages: ZhipuMessage[] = [
+    {
+      role: 'system',
+      content: `你是一位资深的战略规划专家，擅长使用"倒推法"（Cascading Goals）构建聚焦式的平衡计分卡战略地图。
+
+**核心理念：不要面面俱到，要聚焦**
+
+企业资源有限，一年内只能打赢 1-2 场关键战役。因此：
+- 不要在每个层级都列满指标
+- 每个层级只列出 2-3 个最关键的战略目标
+- 所有目标都必须直接支撑年度财务目标
+
+**倒推法思维链**（从上往下拆解）：
+
+1. **财务层 (Financial)** - 顶层锚点
+   - 目标金额：¥${step3TargetAmount || 0}万
+   - 拆解：为了达成这个目标，我们需要在"营收增长"和"利润提升"之间如何权衡？
+
+2. **客户层 (Customer)** - 价值主张
+   - 思考：为了实现财务目标，我们要给客户创造什么独特价值？
+   - ${theme === 'product-leadership' ? '产品领先战略：客户购买的是"创新"和"差异化"' : ''}
+   - ${theme === 'customer-intimacy' ? '客户亲密战略：客户购买的是"贴心服务"和"定制化"' : ''}
+   - ${theme === 'operational-excellence' ? '卓越运营战略：客户购买的是"性价比"和"可靠性"' : ''}
+
+3. **流程层 (Process)** - 关键能力
+   - 思考：为了提供上述客户价值，哪个内部流程必须做到行业顶尖？
+   - ${theme === 'product-leadership' ? '聚焦：研发流程、产品迭代流程、创新管理流程' : ''}
+   - ${theme === 'customer-intimacy' ? '聚焦：客户服务流程、客户关系管理、需求挖掘流程' : ''}
+   - ${theme === 'operational-excellence' ? '聚焦：供应链流程、成本控制流程、质量管理流程' : ''}
+
+4. **学习层 (Learning)** - 支撑体系
+   - 思考：为了让这个流程卓越，我们需要什么样的人才和系统？
+   - 聚焦：关键人才能力、数据系统、组织激励
+
+**输出规则**：
+- 每个层级 2-3 个卡片即可
+- 卡片标题：简短的动宾短语（如"提升客单价"、"加速产品迭代"）
+- 每个卡片 3-5 个具体举措
+- 高亮 3-5 个"必赢战役"（通常在流程层和学习层）
+
+**编号系统**：
+- 财务层：F1, F2, F3...
+- 客户层：C1, C2, C3...
+- 流程层：P1, P2, P3...
+- 学习层：L1, L2, L3...
+
+**因果连接**（parentCardIds 和 childCardIds）：
+- F1 → C1（F1 依赖 C1 的达成）
+- C1 → P1（C1 需要 P1 的支撑）
+- P1 → L1（P1 需要 L1 的支撑）
+- 确保形成完整的因果链条`
+    },
+    {
+      role: 'user',
+      content: `请基于以下信息，生成聚焦式战略地图：
+
+**年度战略主题**：${themeDescription}
+
+**增长来源分析**：
+${growthAnalysis}
+
+**Step 1 - 核心短板（根因）**：
+${step1RootCause}
+
+**Step 2 - SWOT 分析**：
+优势 (S)：${step2Swot.strengths.join('、')}
+劣势 (W)：${step2Swot.weaknesses.join('、')}
+机会 (O)：${step2Swot.opportunities.join('、')}
+威胁 (T)：${step2Swot.threats.join('、')}
+
+${step2TowsStrategies ? `**TOWS 交叉策略**：
+SO 策略：${step2TowsStrategies.so.join('；')}
+WO 策略：${step2TowsStrategies.wo.join('；')}
+ST 策略：${step2TowsStrategies.st.join('；')}
+WT 策略：${step2TowsStrategies.wt.join('；')}` : ''}
+
+**Step 3 - 目标金额**：¥${step3TargetAmount || 0}万
+
+请以 JSON 格式返回战略地图：
+{
+  "theme": "${theme}",
+  "themeDescription": "${themeDescription}",
+  "targetAmount": ${step3TargetAmount || 0},
+  "layers": {
+    "financial": [
+      {
+        "id": "F1",
+        "layer": "financial",
+        "number": 1,
+        "title": "财务目标1",
+        "description": "详细描述",
+        "items": ["举措1", "举措2", "举措3"],
+        "parentCardIds": [],
+        "childCardIds": ["C1"],
+        "isHighlighted": false,
+        "isEditable": true
+      }
+    ],
+    "customer": [...],
+    "process": [...],
+    "learning": [...]
+  },
+  "confirmed": false
+}
+
+**重要**：
+- 根据战略主题 ${theme} 聚焦关键目标
+- 每个层级 2-3 个卡片
+- 必赢战役标记在流程层和学习层
+- 确保因果链条完整（F→C→P→L）`
+    }
+  ];
+
+  const response = await callZhipuAPI(apiKey, messages);
+
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return parsed;
+    }
+  } catch (e) {
+    console.error('解析战略地图 JSON 失败:', e);
+  }
+
+  // 返回默认结构
+  return {
+    theme,
+    themeDescription,
+    targetAmount: step3TargetAmount || 0,
+    layers: {
+      financial: [],
+      customer: [],
+      process: [],
+      learning: []
+    },
+    confirmed: false
+  };
+}
+
+/**
+ * 生成单个层级的战略卡片建议（用于 AI 侧边栏）
+ * 根据用户点击的泳道，提供针对性的战略要素建议
+ */
+export async function generateCardSuggestions(
+  apiKey: string,
+  context: {
+    targetAmount: number;
+    rootCause: string;
+    swot?: {
+      strengths: string[];
+      weaknesses: string[];
+      opportunities: string[];
+      threats: string[];
+    };
+    towsStrategies?: {
+      so: string[];
+      wo: string[];
+      st: string[];
+      wt: string[];
+    };
+  },
+  swimlane: 'financial' | 'customer' | 'process' | 'learning',
+  existingNodes: any[] = []
+): Promise<Array<{
+  title: string;
+  description: string;
+  items: string[];
+}>> {
+  // 分析已存在的卡片，避免重复
+  const existingTitles = existingNodes.map(n => n.data?.title || '').filter(Boolean);
+
+  const layerPrompts = {
+    financial: {
+      question: '为了达成年度目标，在财务层面我们应该关注哪些关键指标？',
+      focus: '财务层面的核心指标通常包括：营收增长、利润率、成本控制、现金流等。'
+    },
+    customer: {
+      question: '为了实现财务目标，我们应该给客户创造什么独特价值？',
+      focus: '客户价值主张可以是：产品差异化、价格优势、服务体验、品牌形象等。'
+    },
+    process: {
+      question: '为了提供上述客户价值，哪个内部流程必须做到行业顶尖？',
+      focus: '关键流程包括：研发创新、生产制造、供应链、客户服务、营销获客等。'
+    },
+    learning: {
+      question: '为了让关键流程卓越，我们需要什么样的人才和系统支撑？',
+      focus: '学习成长要素包括：关键人才、技能培训、数据系统、组织文化、激励机制等。'
+    }
+  };
+
+  const messages: ZhipuMessage[] = [
+    {
+      role: 'system',
+      content: `你是一位资深的战略规划专家，擅长为平衡计分卡的各个层级提供精准的战略要素建议。
+
+**你的任务**：
+当用户点击某个层级（泳道）时，为该层级推荐 3-5 个具体的战略目标卡片。
+
+**层级特点**：
+- **财务层**：关注营收、利润、成本、现金流等财务指标
+- **客户层**：关注价值主张、客户满意度、市场份额、品牌形象
+- **流程层**：关注研发、生产、供应链、服务等关键流程
+- **学习层**：关注人才、技能、系统、文化、激励等支撑体系
+
+**输出规则**：
+- 每个建议包含：标题（动宾短语）、描述、3-5个具体举措
+- 标题要简短有力（如"提升客户满意度"、"加速产品迭代"）
+- 避免与已存在的卡片重复
+- 结合用户的具体情况（根因、SWOT）提供针对性建议`
+    },
+    {
+      role: 'user',
+      content: `请为 ${layerPrompts[swimlane].question}
+
+**上下文信息**：
+- 年度目标金额：¥${context.targetAmount}万
+- 核心短板：${context.rootCause}
+
+${context.swot ? `**SWOT 分析**：
+优势：${context.swot.strengths.join('、')}
+劣势：${context.swot.weaknesses.join('、')}
+机会：${context.swot.opportunities.join('、')}
+威胁：${context.swot.threats.join('、')}` : ''}
+
+${context.towsStrategies ? `**TOWS 策略**：
+SO：${context.towsStrategies.so.join('；')}
+WO：${context.towsStrategies.wo.join('；')}
+ST：${context.towsStrategies.st.join('；')}
+WT：${context.towsStrategies.wt.join('；')}` : ''}
+
+${existingTitles.length > 0 ? `**已存在的卡片**：${existingTitles.join('、')}（请避免重复）` : ''}
+
+**指导说明**：
+${layerPrompts[swimlane].focus}
+
+请以 JSON 数组格式返回建议：
+[
+  {
+    "title": "提升客户满意度",
+    "description": "通过提升服务质量，增强客户粘性",
+    "items": ["建立客户反馈机制", "优化服务流程", "提升客服响应速度", "定期客户回访"]
+  },
+  ...
+]`
+    }
+  ];
+
+  const response = await callZhipuAPI(apiKey, messages);
+
+  try {
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('解析卡片建议 JSON 失败:', e);
+  }
+
+  // 返回默认建议
+  const defaultSuggestions = {
+    financial: [
+      {
+        title: '提升营收增长率',
+        description: '通过扩大客户基础和提升客单价实现营收增长',
+        items: ['拓展新客户', '提升复购率', '优化产品定价', '推出增值服务']
+      },
+      {
+        title: '优化成本结构',
+        description: '通过运营优化降低成本，提升利润率',
+        items: ['降低采购成本', '提升运营效率', '减少浪费', '优化人员配置']
+      }
+    ],
+    customer: [
+      {
+        title: '提升客户满意度',
+        description: '提供卓越的客户体验，增强客户忠诚度',
+        items: ['建立客户反馈机制', '优化服务流程', '提升客服响应速度', '定期客户回访']
+      },
+      {
+        title: '打造品牌差异化',
+        description: '建立独特的品牌定位，与竞争对手区分开来',
+        items: ['明确品牌定位', '塑造品牌故事', '统一品牌形象', '加强品牌传播']
+      }
+    ],
+    process: [
+      {
+        title: '加速产品创新',
+        description: '快速响应市场需求，推出有竞争力的产品',
+        items: ['建立研发流程', '加强市场调研', '缩短产品迭代周期', '鼓励创新思维']
+      },
+      {
+        title: '优化供应链管理',
+        description: '建立高效稳定的供应链体系',
+        items: ['优化供应商选择', '建立安全库存', '提升物流效率', '数字化供应链管理']
+      }
+    ],
+    learning: [
+      {
+        title: '培养关键人才',
+        description: '建立人才梯队，支撑业务发展',
+        items: ['建立培训体系', '导师制度', '职业发展规划', '激励机制']
+      },
+      {
+        title: '建设数据系统',
+        description: '用数据驱动决策，提升运营效率',
+        items: ['建立数据仓库', 'BI分析系统', '数据治理体系', '培养数据思维']
+      }
+    ]
+  };
+
+  return defaultSuggestions[swimlane] || [];
+}

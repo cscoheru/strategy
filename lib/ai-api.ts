@@ -27,36 +27,6 @@ function getProviderConfig(provider: ModelProvider, baseUrl?: string): { url: st
         url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
         headers: {}
       };
-    case 'openai':
-      return {
-        url: 'https://api.openai.com/v1/chat/completions',
-        headers: {}
-      };
-    case 'qwen':
-      return {
-        url: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
-        headers: {}
-      };
-    case 'deepseek':
-      return {
-        url: 'https://api.deepseek.com/v1/chat/completions',
-        headers: {}
-      };
-    case 'wenxin':
-      return {
-        url: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-3.5-8k',
-        headers: {}
-      };
-    case 'ollama':
-      return {
-        url: `${baseUrl || 'http://localhost:11434'}/v1/chat/completions`,
-        headers: {}
-      };
-    case 'custom':
-      return {
-        url: `${baseUrl || ''}/v1/chat/completions`,
-        headers: {}
-      };
     default:
       return {
         url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
@@ -76,24 +46,6 @@ function buildHeaders(config: ModelConfig): HeadersInit {
       return {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
-      };
-    case 'openai':
-    case 'deepseek':
-    case 'ollama':
-    case 'custom':
-      return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      };
-    case 'qwen':
-      return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      };
-    case 'wenxin':
-      // 文心一言使用 access_token，需要额外处理
-      return {
-        'Content-Type': 'application/json',
       };
     default:
       return {
@@ -116,15 +68,6 @@ function buildRequestBody(config: ModelConfig, messages: AIMessage[]): any {
     max_tokens: 2000,
   };
 
-  // 文心一言特殊处理
-  if (config.provider === 'wenxin') {
-    body.messages = messages.map(m => ({
-      role: m.role === 'system' ? 'user' : m.role,
-      content: m.role === 'system' ? `[系统指令] ${m.content}` : m.content
-    }));
-    body.stream = false;
-  }
-
   return body;
 }
 
@@ -140,17 +83,7 @@ export async function callAI(
     const headers = buildHeaders(config);
     const body = buildRequestBody(config, messages);
 
-    // 文心一言需要 access_token
-    let url = providerConfig.url;
-    if (config.provider === 'wenxin' && config.apiKey) {
-      const [ak, sk] = config.apiKey.split('.');
-      if (ak && sk) {
-        // 这里简化处理，实际应该生成 access_token
-        // 用户可以直接在 baseUrl 中输入完整的 URL
-      }
-    }
-
-    const response = await fetch(url, {
+    const response = await fetch(providerConfig.url, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
