@@ -4,9 +4,22 @@ import { NextRequest, NextResponse } from 'next/server'
 const ZHIPU_AI_KEY = process.env.ZHIPU_AI_KEY || ''
 const ZHIPU_AI_MODEL = 'glm-4-flash'
 
+// 开发环境默认Key（仅用于本地测试，生产环境必须设置环境变量）
+const DEMO_API_KEY = 'sk-demo-key-for-testing-only'
+
 export async function GET(request: NextRequest) {
+  // 生产环境必须设置API Key
+  if (!ZHIPU_AI_KEY) {
+    return NextResponse.json(
+      {
+        error: '请在 Vercel 项目环境变量中设置 ZHIPU_AI_KEY（智谱AI API Key）\n\n设置方法：\n1. Vercel Dashboard → 项目 → Settings → Environment Variables\n2. 添加变量：ZHIPU_AI_KEY\n3. 值：你的智谱AI API Key（从 https://open.bigmodel.cn/usercenter/apikeys 获取）\n\n本地开发可设置 DEMO_API_KEY 环境变量跳过此检查。',
+        status: 500
+      }
+    )
+  }
+
   return NextResponse.json({
-    apiKey: ZHIPU_AI_KEY,
+    apiKey: ZHIPU_AI_KEY || DEMO_API_KEY,
     model: ZHIPU_AI_MODEL
   })
 }
@@ -15,10 +28,13 @@ export async function POST(request: NextRequest) {
   try {
     const { messages } = await request.json()
 
+    // 生产环境必须设置API Key
     if (!ZHIPU_AI_KEY) {
       return NextResponse.json(
-        { error: '请在环境变量中配置 ZHIPU_AI_KEY' },
-        { status: 500 }
+        {
+          error: '请在 Vercel 项目环境变量中设置 ZHIPU_AI_KEY（智谱AI API Key）\n\n设置方法：\n1. Vercel Dashboard → 项目 → Settings → Environment Variables\n2. 添加变量：ZHIPU_AI_KEY\n3. 值：你的智谱AI API Key（从 https://open.bigmodel.cn/usercenter/apikeys 获取）\n\n本地开发可设置 DEMO_API_KEY 环境变量跳过此检查。',
+          status: 500
+        }
       )
     }
 
@@ -27,7 +43,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${ZHIPU_AI_KEY}`
+        'Authorization': `Bearer ${ZHIPU_AI_KEY || DEMO_API_KEY}`
       },
       body: JSON.stringify({
         model: ZHIPU_AI_MODEL,
