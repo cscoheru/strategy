@@ -20,12 +20,33 @@ export interface ZhipuResponse {
 
 /**
  * 调用智谱 AI API
+ * 如果没有提供 API Key，则使用后端 API（环境变量）
  */
 export async function callZhipuAPI(
   apiKey: string,
   messages: ZhipuMessage[]
 ): Promise<string> {
   try {
+    // 如果没有前端 API Key，使用后端 API
+    if (!apiKey) {
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ messages }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`后端 API 调用失败: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      return data.content || '';
+    }
+
+    // 使用前端 API Key 直接调用
     const response = await fetch(ZHIPU_API_URL, {
       method: 'POST',
       headers: {

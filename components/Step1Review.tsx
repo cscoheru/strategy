@@ -94,10 +94,6 @@ export default function Step1Review() {
 
   // 分析业绩差距
   const handleAnalyze = async () => {
-    if (!modelConfig.apiKey) {
-      alert('请先在设置中配置 AI API Key');
-      return;
-    }
     if (!goals.trim() || !actuals.trim()) {
       alert('请填写完整的目标和实际完成数据');
       return;
@@ -105,7 +101,8 @@ export default function Step1Review() {
 
     setIsAnalyzing(true);
     try {
-      const result = await generateAttributionMap(modelConfig.apiKey, goals, actuals);
+      // 使用后端 API，无需前端 API Key
+      const result = await generateAttributionMap('', goals, actuals);
       setSummary(result.summary);
       // 类型转换：API 返回的 id 是 string，需要转换为 DimensionType
       setDimensions(result.dimensions.map(d => ({ ...d, id: d.id as any })));
