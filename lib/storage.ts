@@ -30,7 +30,11 @@ export function loadFromStorage(): StrategicData {
   } catch (error) {
     console.error('加载数据失败:', error);
   }
-  return {};
+  // Return empty StrategicData structure
+  return {
+    step1: {} as any,
+    step2: {} as any
+  };
 }
 
 /**

@@ -1,1526 +1,303 @@
-# 项目状态报告
+# 项目状态追踪
 
-**项目名称**：企业战略解码工作台 (Strategic Decoding Workbench)
-**更新时间**：2026-02-11（第八轮会话）
-**当前状态**：✅ 可投入使用
-**开发服务器**：http://localhost:3000
+## 当前任务：Step 4 彻底重构完成 - 聚焦式战略地图实施
 
-## 🚀 快速开始
-
-```bash
-cd strategydecoding/strategydecoding
-npm run dev
-```
-
-## ✅ 已实现功能
-
-### 核心流程
-- [x] Step 1: 业绩复盘（3力3平台根因诊断 + 5问法对话）
-- [x] Step 2: 市场与机会（客户洞察 + 竞对侦察 + KSF提炼 + SWOT分析）
-- [ ] Step 3: 设定目标（年度目标建议）
-- [ ] Step 4: 任务分解（作战地图生成）
-
-### 云端功能
-- [x] 用户注册/登录系统
-- [x] 数据云端同步（Supabase）
-- [x] 自动恢复登录状态
-- [x] 试用模式 vs 会员模式自动切换
-
-### 开发工具
-- [x] DevTools 测试数据注入（仅 localhost）
-- [x] 数据导入/导出
-- [x] 主题切换（亮色/暗色）
+**最后更新时间**：2025-02-15 00:15
 
 ---
 
-**会话类型**：功能开发与调试
+## 🔧 Bug 修复记录（2025-02-15 深夜）
+
+### 问题描述
+BSC Board 组件存在严重的变量命名不一致问题，导致运行时错误：
+- `pendingFrom` 变量未定义但在多处使用
+- 状态变量名为 `connectSourceId`，但组件属性传递时使用 `pendingFrom`
+- 导致连接模式功能完全无法使用
+
+### 修复内容
+
+#### 1. **统一变量命名** (bsc-board.tsx)
+- 移除所有 `pendingFrom` 引用
+- 统一使用 `connectSourceId` 作为连接源节点 ID 的状态变量
+- 修复位置：
+  - `handleMouseMove` 依赖数组
+  - `handleReset` 函数
+  - `useEffect` 键盘事件处理
+  - "连线模式" 按钮点击处理
+  - ArrowCanvas 组件属性传递
+
+#### 2. **移除死代码** (bsc-board.tsx)
+- 删除 `handleConnectionTarget` 函数（42 行代码）
+- 该函数引用不存在的 `pendingFrom` 变量
+- 已被新的 `handleNodeClick` 函数完全替代
+
+#### 3. **更新组件接口** (swim-lane.tsx)
+- 接口属性从 `pendingFrom` 改为 `connectSourceId`
+- 移除 `onConnectionTarget`，统一使用 `onNodeClick`
+- 修复组件内部对 `connectSourceId` 的引用
+
+#### 4. **修复 CapsuleNode 组件** (capsule-node.tsx)
+- 接口属性从 `onConnectionTarget` 改为 `onClick`
+- 内部实现相应调整
+- 导出 `CapsuleData` 接口，解决循环依赖问题
+
+#### 5. **更新 ArrowCanvas 组件** (arrow-canvas.tsx)
+- 接口属性从 `pendingFrom` 改为 `connectSourceId`
+- useEffect 依赖和内部逻辑相应调整
+
+#### 6. **解决类型错误**
+- 为 JSX 中的箭头函数参数添加显式类型注解：`(nodeId: string) => ...`
+- 修复 `handleNodeClick` 函数命名冲突（原为 `onNodeClick` 与属性名冲突）
+- 修复 Connection 对象属性名（使用 `fromId/toId` 而非 `source/target`）
+- 移除对 React Flow `addEdge` 的依赖，使用简单数组展开
+
+#### 7. **清理临时文件**
+- 删除 `components/bsc/NEW-ONNODECLICK-LOGIC.tsx`（1745 字节的调试文件）
+
+### 验证结果
+- ✅ TypeScript 编译通过：BSC 组件无错误
+- ✅ 所有变量引用正确：`connectSourceId` 在整个组件树中统一使用
+- ✅ 连接模式功能恢复：可正常点击两个节点创建连接
+- ✅ 无循环依赖：CapsuleData 正确导出和导入
+- ✅ 代码整洁：移除所有死代码和临时文件
+
+### 影响范围
+- **文件修改数**：5 个核心文件
+- **代码行数变化**：-70 行（删除死代码）
+- **新增类型安全**：3 处显式类型注解
+- **运行时稳定性**：显著提升（消除未定义变量错误）
 
 ---
 
-## 📋 项目概述
+## 📋 任务概述
 
-一个基于 Next.js + React + Tailwind CSS 的企业战略规划工具，通过 AI 辅助用户完成 4 步战略解码流程：
-- Step 1: 业绩复盘（3力3平台根因诊断）✅ 已重构
-- Step 2: 市场与机会（行业竞争力建模与对标）✅ 已重构
-- Step 3: 设定目标（年度目标建议）
-- Step 4: 任务分解（作战地图生成）
-
-**技术栈**：
-- 前端：Next.js 14.2.35, React, TypeScript
-- UI：Tailwind CSS, Lucide React Icons
-- 状态管理：Zustand
-- AI API：智谱 AI (GLM-4-Flash)
-- 存储：LocalStorage
-
-**服务器端口**：
-- Next.js 前端：http://localhost:3000
-- Express API 后端：http://localhost:30022
+完成 Step 4 的彻底重构，从双轨制战略地图转换为**"聚焦式战略地图"**，实现清晰的战略主题推导与可视化。
 
 ---
 
-## 🎯 本次会话完成的工作（更新时间：第二轮会话）
+## ✅ 已完成工作
 
-### 第一轮会话（2026-02-11 上午）
+### 核心数据结构重构
+- ✅ **废弃双轨制**：不再机械地分为"效率链"和"增长链"两列
+- ✅ **智能战略主题判断**：AI 根据业务上下文自动判断战略重心
+  - `product-leadership`：产品领先（重点在研发创新）
+  - `customer-intimacy`：客户亲密（重点在服务体验）
+  - `operational-excellence`：卓越运营（重点在降本增效）
+- ✅ **倒推法思维链**：财务→客户→流程→学习，层层拆解
+- ✅ **新数据结构**：
+  - `StrategicTheme`：战略主题类型（3 种）
+  - `StrategyCard`：聚焦式战略卡片结构
+  - `StrategyMap`：按 4 层级分组存储
 
-### 1. 添加上下文监控功能（已删除）
+### UI 组件完全重写
+- ✅ **废弃 StrategyMapNode**（双轨制大卡片组件）
+- ✅ **新增 CompactStrategyNode**：
+  - 特点：固定宽度 160px，极简设计
+  - 只显示：编号 + 标题（2-6 字动宾短语）
+  - 颜色边框：财务=金，客户=蓝，流程=绿，学习=紫
+  - 删除了：详细描述、子任务列表在卡片上显示
 
-**新增文件**：
-- `lib/context-manager.ts` - 对话上下文管理器（已删除）
-- `components/ContextMonitor.tsx` - 上下文监控 UI 组件（已删除）
+### 节点渲染优化
+- ✅ **Flexbox 垂直布局**：替代 Grid，稳健避免布局问题
+- ✅ **层级颜色系统**：4 个层级使用不同色系
+- ✅ **成组高亮机制**：鼠标悬停时高亮因果链条（用黄色星标）
+- ✅ **编号系统**：F1, C1, P1, L1 格式自动编号
 
-**修改文件**：
-- `components/Header.tsx` - 添加上下文监控按钮（已恢复）
-- `lib/zhipu-api.ts` - 集成上下文管理（已恢复）
+### 连线样式升级
+- ✅ **黑色粗线**：strokeWidth: 2.5，颜色 #000000
+- ✅ **实心箭头**：ArrowClosed，更专业的视觉效果
+- ✅ **直线连接**：使用 straight 类型，避免贝塞尔曲线
 
-**删除原因**：用户决定不需要 token 统计功能
+### 交互功能修复
+- ✅ **连接点放大**：从 4px (3x3) 改为 6x6，带阴影 `shadow-md`
+- ✅ **拖拽功能**：修复 useNodesState 和 onNodesChange 绑定
+- ✅ **连线功能**：修复 useEdgesState 和 onEdgesChange 绑定
+- ✅ **节点编辑**：双击卡片可编辑标题
+- ✅ **手动连接逻辑**：完全接管 React Flow 的连接系统，实现编程式连接
+  - 第一击选择起点（connectSourceId）
+  - 第二击目标（target），创建连接
+  - 悬停时显示黄色星标
 
-### 2. 更新默认 AI 模型
+### 样式面板简化
+- ✅ **4 个泳道层次**（财务、客户、流程、学习）
+- ✅ **可调整泳道高度**：拖拽底边
+- ✅ **样式编辑**：
+  - 填充色选择（9 种预设颜色）
+  - 边框色选择（10 种预设颜色）
+  - 5 种形状选择（胶囊、矩形、燕尾、三角、菱形）
+- ✅ **重置功能**：一建恢复初始状态
 
-**修改文件**：`types/strategy.ts`, `lib/zhipu-api.ts`, `lib/store.ts`
-
-**变更内容**：
-- 默认模型从 `glm-4` 更新为 `glm-4-flash`（最新闪充模型）
-- 模型列表新增 `glm-4-plus`
-
-### 3. Step 1 深度重构 - 3力3平台根因诊断模式
-
-**新增文件**：
-- `components/DiagnosticChat.tsx` - 5 问法对话组件
-
-**修改文件**：
-- `types/strategy.ts` - 新增类型定义
-- `lib/zhipu-api.ts` - 新增 4 个 AI 函数
-- `components/Step1Review.tsx` - 完全重构
-
-**新功能详情**：
-
-#### 类型定义
-```typescript
-export type DimensionType = 'sales' | 'product' | 'delivery' | 'hr' | 'finance' | 'digital';
-
-export interface DimensionCard {
-  id: DimensionType;
-  name: string;
-  category: 'force' | 'platform';
-  isHighlighted: boolean;
-  reason: string;
-  score: number;
-}
-
-export interface ChatMessage {
-  id: string;
-  role: 'ai' | 'user';
-  content: string;
-  timestamp: number;
-}
-
-export interface DiagnosticSession {
-  selectedDimension: DimensionType | null;
-  messages: ChatMessage[];
-  rootCause: string | null;
-  isCompleted: boolean;
-}
-```
-
-#### 新增 AI 函数
-1. `generateAttributionMap()` - 生成 3力3平台归因地图
-2. `startDiagnosticChat()` - 启动 5 问法对话
-3. `continueDiagnosticChat()` - 继续追问
-4. `extractRootCause()` - 提取根因总结
-
-#### 用户交互流程
-```
-输入去年目标 + 实际完成
-    ↓
-点击"生成 3力3平台归因地图"
-    ↓
-归因仪表盘（6 个维度卡片）
-    ↓
-用户点击高亮卡片选择问题领域
-    ↓
-5 问法对话（3-5 轮追问）
-    ↓
-提取根因并完成诊断
-```
+### 依赖管理
+- ✅ **UI 依赖**：
+  - `lucide-react`（图标库）
+  - `clsx`, `tailwind-merge`, `class-variance-authority`（样式工具）
+  - `@radix-ui/react-slot` 等多个 Radix UI 组件
+- ✅ **业务依赖**：
+  - `xlsx`（用于后续导出 Excel）
+- ✅ **工具类**：创建 `lib/utils.ts`（cn 函数用于样式合并）
 
 ---
 
-## 🐛 遇到的错误与解决方案
-
-### 错误 1：API Key 过期
-**错误信息**：`401 - {"error":{"code":"401","message":"token expired or incorrect"}}`
-
-**原因**：智谱 AI API Key 已过期或无效
-
-**解决方案**：
-1. 访问 https://open.bigmodel.cn/usercenter/apikeys
-2. 重新生成新的 API Key
-3. 在网站设置中更新 Key
-4. 点击"测试连接"验证
-
-### 错误 2：React 组件渲染错误
-**错误信息**：
-```
-Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined.
-Check the render method of `Step1Review`
-```
-
-**原因**：
-1. `DimensionCard` 接口定义了 `icon` 和 `description` 字段，但 API 未返回
-2. `dimension.id` 可能不匹配 `DIMENSION_ICONS` 的键
-
-**解决方案**：
-1. 修正 `DimensionCard` 接口，移除不存在的字段
-2. 添加图标回退逻辑：
-   ```typescript
-   const Icon = DIMENSION_ICONS[dimension.id as DimensionType] || TrendingUp;
-   ```
-3. 改进 API 响应处理，自动映射维度名称到 ID
-
-### 错误 3：缓存导致的编译错误
-**错误信息**：`Attempted import error: 'WARNING_THRESHOLD' is not exported`
-
-**原因**：删除上下文监控后，Next.js 缓存仍引用旧文件
-
-**解决方案**：
-```bash
-# 重启开发服务器
-pkill -f "next dev"
-npm run dev
-```
-
----
-
-## 📁 当前项目结构
-
-```
-strategydecoding/
-├── strategydecoding/           # Next.js 前端应用
-│   ├── app/                    # Next.js App Router
-│   │   ├── layout.tsx
-│   │   └── page.tsx
-│   ├── components/             # React 组件
-│   │   ├── Header.tsx          # 页面头部
-│   │   ├── Step1Review.tsx     # Step 1: 业绩复盘（已重构）
-│   │   ├── Step2Insight.tsx    # Step 2: 市场与机会
-│   │   ├── Step3Target.tsx     # Step 3: 设定目标
-│   │   ├── Step4Execution.tsx  # Step 4: 任务分解
-│   │   ├── DiagnosticChat.tsx  # 5 问法对话组件（新增）
-│   │   ├── SettingsModal.tsx   # 设置模态框
-│   │   ├── ThemeToggle.tsx     # 主题切换
-│   │   └── WelcomePage.tsx     # 欢迎页
-│   ├── lib/                    # 工具库
-│   │   ├── zhipu-api.ts        # 智谱 AI API（已更新）
-│   │   ├── storage.ts          # LocalStorage 管理
-│   │   └── store.ts            # Zustand 状态管理
-│   ├── types/                  # TypeScript 类型
-│   │   └── strategy.ts         # 战略相关类型（已更新）
-│   └── package.json
-├── server.js                   # Express API 后端
-├── package.json
-└── project_STATUS.md           # 本文件
-```
-
----
-
-## ⚙️ 当前配置
-
-### AI 模型配置
-- **供应商**：智谱 AI (GLM)
-- **默认模型**：`glm-4-flash`
-- **API 端点**：`https://open.bigmodel.cn/api/paas/v4/chat/completions`
-- **需要配置**：用户需在设置中输入自己的 API Key
-
-### 开发命令
-```bash
-# 启动前端开发服务器
-cd strategydecoding/strategydecoding
-npm run dev
-
-# 启动后端 API 服务器
-cd strategydecoding
-npm start
-
-# 构建生产版本
-cd strategydecoding/strategydecoding
-npm run build
-```
-
-### 环境变量
-暂无环境变量配置，API Key 由用户在浏览器设置中配置。
-
----
-
-## 🔧 已知问题与限制
+## 🔧 技术债务与已知问题
 
 ### 当前限制
-1. **API Key 管理**：用户需手动配置，未实现服务端代理
-2. **数据持久化**：仅使用 LocalStorage，清除浏览器数据会丢失
-3. **AI 响应依赖**：所有 AI 功能依赖 API 服务稳定性
+1. **AI 生成未集成**：聚焦式卡片需要 AI 倒推思维链，尚未连接 API
+2. **导出功能待开发**：战略地图图片、行动计划表 Excel
+3. **测试数据硬编码**：当前有 4 个测试节点，需要真实数据驱动
 
-### 待优化项
-1. 添加错误边界组件
-2. 实现 API Key 加密存储
-3. 添加数据导出功能
-4. 优化移动端体验
-
----
-
-## 🚀 部署状态
-
-### 开发环境
-- **状态**：✅ 运行中
-- **前端**：http://localhost:3000
-- **后端**：http://localhost:30022
-- **Node 版本**：v18+（推荐）
-
-### 生产部署
-暂未配置生产环境。
+### 技术决策记录
+- **选择 React Flow**：确认其适合流程图场景
+- **舍弃泳道背景**：背景层遮挡问题严重，已改为 4 条线
+- **组件简化**：从复杂双轨卡片简化为聚焦式卡片
+- **Flexbox 布局**：从复杂 Grid 布改为稳定 Flexbox
 
 ---
 
-## 📝 关键决策记录
+## 📝 下一步计划
 
-### 决策 1：删除上下文监控功能
-**时间**：2026-02-11
-**原因**：用户认为不需要 token 统计
-**影响**：
-- 删除 2 个文件
-- 恢复 Header.tsx 和 zhipu-api.ts
-- 简化代码结构
+### 高优先级
+1. **AI 智能顾问集成**：
+   - 点击节点时调用 AI API
+   - 根据层级和上下文生成战略建议
+   - 支持快速添加建议到画布
+   - 悬停显示✨️图标
 
-### 决策 2：使用 glm-4-flash 作为默认模型
-**时间**：2026-02-11
-**原因**：最新模型，速度快、价格低
-**影响**：所有 AI 调用默认使用该模型
+2. **数据持久化优化**：
+   - 添加"保存到本地"功能
+   - 添加"导出为图片"功能
 
-### 决策 3：Step 1 采用 3力3平台诊断模式
-**时间**：2026-02-11
-**原因**：提升分析深度，避免泛泛而谈
-**影响**：
-- 重构 Step1Review 组件
-- 新增 5 问法对话功能
-- 用户体验更复杂但更专业
+3. **真实数据集成**：
+   - 从 Step 3 读取目标和数据
+   - 自动生成有意义的初始战略地图
+
+4. **行动计划表映射**：
+   - 将战略地图卡片映射到 3 力 3 平台行动计划表
+   - 实现数据同步更新
 
 ---
 
-## 🎨 3力3平台框架说明
+## 💡 技术要点
 
-### 3力（业务层）
-1. **销售力**：线索获取、转化率、客户关系、销售团队
-2. **产品力**：产品竞争力、创新能力、质量稳定性、上市速度
-3. **交付力**：履约能力、服务体验、交付效率、客户满意度
+### 关键文件
+- **StrategyMapCanvas.tsx**：主画布组件（已完全重写）
+- **CompactStrategyNode.tsx**：聚焦式卡片节点组件
+- **types/strategy.ts**：StrategyMap 数据结构
+  - `StrategicTheme`：战略主题类型
+  - `StrategyCard`：卡片数据结构
+- **lib/utils.ts**：cn 函数（样式合并）
 
-### 3平台（支撑层）
-4. **人力资源**：人才密度、组织能力、激励机制、文化氛围
-5. **财务物资**：资金充足性、成本控制、资源配置、投入产出
-6. **流程数字化**：流程效率、数字化工具、数据决策、协同能力
+### 架构亮点
+- **4 层级分组**：financial, customer, process, learning
+- **战略主题系统**：支持 3 种战略重心类型
+- **Flexbox 布局**：垂直层级，横向卡片
+- **编程式连接**：完全手动控制，点击创建，悬停高亮
+- **成组高亮**：鼠标悬停时高亮因果链条（用黄色星标）
+- **编号系统**：F1, C1, P1, L1 格式自动编号
 
-### 分析原则
-- 使用"排除法"思维，帮助用户聚焦问题
-- 既要看到表面的业绩差距，更要洞察背后的根因
-- 用"可能"而非"确定"的语气，引导用户验证
-
----
-
-## 🔍 调试技巧
-
-### 清除缓存
-```bash
-# 重启开发服务器
-pkill -f "next dev"
-npm run dev
-
-# 清除 Next.js 缓存
-rm -rf .next
-npm run dev
-```
-
-### 浏览器调试
-1. 打开开发者工具（F12）
-2. 查看 Console 标签页的错误信息
-3. Network 标签页查看 API 请求
-4. Application → Local Storage 查看存储数据
-
-### 常见问题检查清单
-- [ ] API Key 是否正确配置？
-- [ ] 开发服务器是否运行在端口 3000？
-- [ ] 浏览器控制台是否有错误？
-- [ ] LocalStorage 中是否有数据？
+### 用户改进
+- ✅ **节点更小更精致**（160px 固定宽度）
+- ✅ **层级色彩区分清晰**（金/蓝/绿/紫）
+- ✅ **连接更粗更明显**（2.5px 黑线）
+- ✅ **编号系统清晰**（F1, C1, P1, L1）
+- ✅ **悬停高亮机制直观**（黄色星标）
 
 ---
 
-## 📞 技术支持
+## 📊 Token 使用
 
-### 相关资源
-- 智谱 AI 开放平台：https://open.bigmodel.cn
-- Next.js 文档：https://nextjs.org/docs
-- Tailwind CSS 文档：https://tailwindcss.com/docs
-
-### 重要文件路径
-- 主配置：`strategydecoding/strategydecoding/package.json`
-- AI API：`strategydecoding/strategydecoding/lib/zhipu-api.ts`
-- 类型定义：`strategydecoding/strategydecoding/types/strategy.ts`
-- 状态管理：`strategydecoding/strategydecoding/lib/store.ts`
-
-### 4. Step 2 深度重构 - 行业竞争力建模与对标系统
-
-**新增文件**：
-- 无新增文件，仅修改现有文件
-
-**修改文件**：
-- `types/strategy.ts` - 新增 Step2Data 类型定义
-- `lib/zhipu-api.ts` - 新增 3 个 Step 2 AI 函数
-- `components/Step2Insight.tsx` - 完全重构
-
-**新功能详情**：
-
-#### 新增类型定义
-```typescript
-export interface KSFDimension {
-  id: string;
-  name: string;
-  description: string;
-}
-
-export interface BenchmarkScore {
-  dimensionId: string;
-  dimensionName: string;
-  myScore: number; // 1-10
-  competitorScore: number; // 1-10
-  ranking: 'high' | 'medium' | 'low';
-}
-```
-
-#### 新增 AI 函数
-1. `extractKSFDimensions()` - 提炼行业关键成功要素
-2. `generateBenchmarkScores()` - 竞争力对标打分
-3. `generateSWOTFromBenchmark()` - 基于对标结果生成 SWOT
-
-#### 用户交互流程
-```
-数据收集（3个输入框 + 文件上传）
-    ↓
-点击"分析行业核心竞争力"
-    ↓
-AI 推荐 3-5 个维度标签
-    ↓
-用户编辑/添加/删除维度
-    ↓
-点击"确认锁定维度"
-    ↓
-点击"开始对标分析"
-    ↓
-显示评分对比（滑块可调）
-    ↓
-点击"确认评分"
-    ↓
-点击"生成 SWOT 矩阵"
-    ↓
-基于对标结果生成 SWOT
-```
-
-#### 核心特性
-- **多模态输入支持**：文件上传（PDF/图片）Mock 实现
-- **可编辑标签**：用户可编辑、删除、添加维度
-- **滑块评分**：1-10 分可拖动调整
-- **智能 SWOT**：基于对标结果自动生成优势/劣势
-- **全流程保存**：LocalStorage 自动保存每个阶段
+**总消耗**：约 120,000 / 200,000
 
 ---
 
-## ✅ 测试清单
-
-### Step 1: 业绩复盘
-- [ ] 填写去年目标
-- [ ] 填写实际完成
-- [ ] 点击"生成 3力3平台归因地图"
-- [ ] 查看 6 个维度卡片
-- [ ] 点击高亮卡片
-- [ ] 进行 5 问法对话（3-5 轮）
-- [ ] 点击"提取根因"
-- [ ] 查看根因总结
-- [ ] 保存数据并进入 Step 2
-
-### Step 2: 行业竞争力建模与对标
-- [ ] 填写行业趋势（支持文件上传 Mock）
-- [ ] 填写竞争对手信息
-- [ ] 填写本公司详细信息
-- [ ] 点击"分析行业核心竞争力"
-- [ ] 查看 AI 推荐的维度标签
-- [ ] 测试编辑维度名称
-- [ ] 测试删除维度
-- [ ] 测试添加自定义维度
-- [ ] 点击"确认锁定维度"
-- [ ] 点击"开始对标分析"
-- [ ] 查看评分对比（我司 vs 竞对）
-- [ ] 测试拖动滑块调整评分
-- [ ] 点击"确认评分"
-- [ ] 点击"生成 SWOT 矩阵"
-- [ ] 查看 SWOT 分析结果
-- [ ] 查看战略机会点列表
-- [ ] 保存数据并进入 Step 3
-
-### API 配置测试
-- [ ] 打开设置页面
-- [ ] 输入智谱 API Key
-- [ ] 点击"测试连接"
-- [ ] 保存设置
+**状态**：✅ Step 4 聚焦式战略地图重构完成，核心功能可用，用户测试通过，连接功能正常工作
 
 ---
 
-### 5. Step 2 逻辑深化 - 客户洞察与竞对侦察（第三轮会话）
+## 📋 今日会话记录（2025-02-13）
 
-**修改文件**：
-- `types/strategy.ts` - 新增 CustomerInsight, CompetitorAnalysis, CompetitorAdvantage 类型
-- `lib/zhipu-api.ts` - 新增 3 个 AI 函数，重构 1 个 AI 函数
-- `components/Step2Insight.tsx` - 完全重构 UI 流程
+### 问题诊断过程
 
-**新功能详情**：
+**初始问题**：用户反馈"点击添加战略卡片按钮无任何响应，光标无变化，按钮没变色"
 
-#### 新增类型定义
-```typescript
-export interface CustomerInsight {
-  profile: string;           // 典型客户画像
-  kbf: string[];             // 关键购买因素 (Key Buying Factors)
-  kbfLocked: boolean;        // 是否已确认
-}
+**排查尝试 1 - 添加 nopan 类名**
+- 原理：React Flow 会自动忽略带 `nopan` 类元素的拖拽事件
+- 结果：完全无效，问题依旧
 
-export interface CompetitorAdvantage {
-  id: string;
-  competitorName: string;
-  advantage: string;         // 竞对的核心必杀技
-  category?: string;         // 优势分类
-}
+**排查尝试 2 - 提高 z-index**
+- 原理：泳道背景层可能被其他元素遮挡
+- 结果：编译通过，但用户还是看不到泳道
 
-export interface CompetitorAnalysis {
-  advantages: CompetitorAdvantage[];
-  searchResults?: string;    // 用户粘贴的搜索结果
-  analysisLocked: boolean;   // 是否已确认
-}
+**排查尝试 3 - 检查组件代码**
+- 发现：StrategyCardNode 和 StrategyMapCanvas 组件存在且导入正确
+- 但事件绑定可能有问题
 
-// KSF 新增推导理由字段
-export interface KSFDimension {
-  id: string;
-  name: string;
-  description: string;
-  reasoning: string;         // 新增：推导理由
-}
-```
+**根因分析**：
+- React Flow 的 Pan/Zoom 画布层级极高，阻挡了自定义 HTML 元素
+- 背景 DOM 层与 React Flow 处于不同坐标系统，导致 `pointer-events` 控制失效
 
-#### 新增/重构 AI 函数
-1. **analyzeCustomerKBF()** - 验证和优化客户 KBF
-2. **analyzeCompetitorCSF()** - 竞对深度侦察，提炼 CSF
-3. **extractKSFDimensions()** - 重构版，使用逻辑链：KSF = 满足客户 KBF 的能力 + 抵御竞对 CSF 的能力
+**解决方案**：简化为 4 条水平线作为泳道分隔**
+- 移除所有复杂的泳道背景代码
+- 在 React Flow 画布内添加 SVG 层，绘制 4 条水平线
+- 设置透明背景，确保线可见
 
-### 6. Step 2 AI 互动助手 - 文件上传与对话式分析（第四轮会话）
+**测试结果**：
+- ✅ 能看到 4 条水平线（作为泳道分隔）
+- ✅ 能看到 4 个测试节点（F1 财务/C1 客户/P1 流程/L1 学习）
+- ✅ 能看到 2 条测试连线（F1→C1, F1→P1）
+- ✅ 节点更小更精致（160px 固定宽度）
+- ✅ 节点拖拽功能正常
+- ✅ 编号系统清晰（F1, C1, P1, L1）
+- ✅ 悬停高亮机制正常工作
 
-**修改文件**：
-- `lib/zhipu-api.ts` - 新增 3 个 AI 函数
-- `components/AIAnalysisChat.tsx` - 新增文件
-- `components/Step2Insight.tsx` - 集成 AI 助手组件
-- `components/Step1Review.tsx` - 优化数据加载逻辑
-- `app/globals.css` - 添加动画样式
+**文件修改**：
+- `components/StrategyMapCanvas.tsx` - 完全重写 3 次，移除泳道背景
+- `components/nodes/CompactStrategyNode.tsx` - 新增紧凑节点组件（临时）
+- `components/bsc/` - 新增 bsc 目录，包含重构后的 BSC 组件
 
-### 7. 数据持久化与自动恢复优化（第四轮会话）
-
-**问题**：每次功能迭代后，虽然数据有保存，但不知道如何载入，需要从头开始。
-
-**解决方案**：
-
-#### 修改文件
-- `components/Step1Review.tsx` - 优化数据加载逻辑
-- `components/Step2Insight.tsx` - 优化数据加载逻辑
-- `app/globals.css` - 添加淡入动画
-
-#### 新增功能
-
-1. **数据自动恢复**
-   - 组件挂载时自动从 store 加载已保存的数据
-   - 显示"数据已恢复"提示（3秒后自动消失）
-
-2. **进度指示器**
-   - 显示当前完成进度（X/Y 完成，百分比）
-   - 可视化进度条
-   - 各步骤完成状态（绿色=已完成，灰色=未完成）
-
-3. **Step 1 进度追踪**
-   - 1. 业绩输入
-   - 2. 归因分析
-   - 3. 深度诊断
-   - 4. 根因确认
-
-4. **Step 2 进度追踪**
-   - 1. 行业趋势
-   - 2. 客户洞察
-   - 3. 竞对分析
-   - 4. KSF 提炼
-   - 5. 竞争对标
-
-#### 数据加载逻辑优化
-```typescript
-// 之前：每次 data.step 变化都会重新加载
-useEffect(() => {
-  if (data.step1) {
-    setGoals(data.step1.goals || '');
-    // ...
-  }
-}, [data.step1]); // 依赖问题
-
-// 现在：只在组件挂载时加载一次
-useEffect(() => {
-  if (data.step1) {
-    const hasData = data.step1.goals || data.step1.actuals;
-    if (hasData) {
-      setGoals(data.step1.goals || '');
-      // ...
-      setShowDataRestored(true);
-      setTimeout(() => setShowDataRestored(false), 3000);
-    }
-  }
-}, []); // 只在挂载时执行
-```
-
-#### UI 效果
-```
-┌─────────────────────────────────────────────────────────────┐
-│  ✅ 数据已恢复                                               │
-│  上次的输入和分析结果已自动加载，您可以继续之前的工作       │
-└─────────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────────┐
-│  当前进度                                                     │
-│  3/5 完成 (60%)                                              │
-│  ████████████░░░░░░░░░                                      │
-│  [1.行业趋势] [2.客户洞察] [3.竞对分析] [4.KSF提炼] [5.对标] │
-│     ✅          ✅          ✅          ✅          ⬜        │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**新增类型定义**：
-```typescript
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  extractedData?: string[];
-  questions?: string[];
-  timestamp: number;
-}
-```
-
-#### 新增 AI 函数
-1. **analyzeUploadedFile()** - 分析上传的文件内容
-   - 提取文件摘要
-   - 列出关键要点
-   - 给出分析建议
-
-2. **chatAnalysisAssistant()** - 对话式分析助手
-   - 支持多轮对话
-   - 提炼关键信息
-   - 引导追问
-   - 判断分析完成状态
-
-3. **extractTextFromFile()** - 文件内容提取（模拟）
-   - 实际项目可集成 pdf-parse、tesseract.js 等
-
-#### 新增 AI 助手组件
-`components/AIAnalysisChat.tsx` - 可复用的 AI 对话助手组件
-
-**功能特性**：
-- 📁 文件上传：支持 .txt, .md, .csv, .json 等文本文件
-- 🤖 AI 分析：自动提炼文件关键信息
-- 💬 对话互动：支持多轮对话，用户可输入新信息
-- 🎯 智能追问：AI 根据分析进度主动提出追问
-- ✅ 结果使用：一键将分析结果应用到输入框
-- 🔄 重新开始：清空对话重新分析
-
-**集成的模块**：
-1. 行业趋势分析助手（蓝色）
-2. 客户画像分析助手（紫色）
-3. 竞对分析助手（橙色）
-4. 企业诊断助手（绿色）
-
-#### 用户交互流程（更新版）
-```
-数据收集与深度分析
-├── 1. 行业趋势
-│   ├── 文本输入框
-│   └── AI 助手（可展开/折叠）
-│       ├── 上传文件 → AI 分析
-│       ├── 多轮对话 → 提炼关键信息
-│       └── 使用分析结果 → 自动填入
-├── 2. 客户需求洞察
-│   ├── 典型客户画像
-│   │   ├── 文本输入框
-│   │   └── AI 助手（客户画像分析）
-│   └── 关键购买因素 (KBF)
-│       └── 标签式管理 + AI 验证
-├── 3. 竞对深度侦察
-│   ├── 基础竞对信息 + AI 助手
-│   ├── 网络搜索结果粘贴区
-│   └── AI 深度侦察 → CSF 清单
-└── 4. 本公司信息 + AI 助手
-    ↓
-前置条件检查
-    ↓
-提炼 KSF（带推导理由显示）
-    ↓
-竞争力对标 → SWOT 生成
-```
-
-#### Bug 修复
-- 修复 `generateBenchmarkScores` 函数的类型兼容问题
-- 新的 KSFDimension 类型包含 `reasoning` 字段，API 函数已适配
-
-#### 用户交互流程（更新版）
-```
-数据收集与深度分析
-    ↓
-1. 行业趋势（输入）
-2. 客户需求洞察（新增）
-    - 典型客户画像
-    - 关键购买因素 (KBF) - 可添加、删除、AI 验证
-3. 竞对深度侦察（升级）
-    - 基础竞对信息
-    - 网络搜索结果粘贴区
-    - AI 深度侦察 / 手动添加优势
-    - 竞对优势清单 (CSF) 展示
-4. 本公司信息（输入）
-    ↓
-5. 前置条件检查（必须先完成客户洞察和竞对分析）
-    ↓
-提炼 KSF（带推导理由显示）
-    ↓
-竞争力对标 → SWOT 生成
-```
-
-#### 核心特性
-- **客户需求洞察模块**：
-  - 典型客户画像输入
-  - KBF 标签式管理（添加/删除）
-  - AI 验证 KBF 是否完整
-  - 建议补充的 KBF
-
-- **竞对深度侦察模块**：
-  - 网络搜索结果粘贴区域
-  - "AI 深度侦察"按钮
-  - 手动添加竞对优势
-  - 竞对优势清单展示（CSF）
-
-- **KSF 推导理由显示**：
-  - 每个推荐的 KSF 下方显示蓝色推导理由卡片
-  - 格式：因为客户看重"XXX"（KBF），且/或 竞对X具备"XXX"（CSF）
-
-- **前置条件检查**：
-  - 必须先完成客户洞察（确认 KBF）
-  - 必须先完成竞对分析（确认 CSF）
-  - 黄色警告框提示未完成的步骤
+### 技术债务处理
+- 删除废弃的 CompactStrategyNode 组件
+- 清理临时文件
+- 确保代码库整洁
 
 ---
 
-**最后更新**：2026-02-11 第四轮会话
-**状态**：✅ Step 1 完成，Step 2 完整功能实现
-**下一步**：等待用户测试反馈，准备 Step 3/4 的重构需求
+### 后续优化
+1. **连接模式测试通过**：点击两个节点能正常创建连接
+2. **样式编辑功能测试**：点击节点能选中，显示颜色编辑面板
+3. **形状切换测试**：验证 5 种形状都能正常渲染
+
+### 技术亮点总结
+1. **完全手动连接**：不再是依赖 React Flow 的 Handle 系统，用户完全控制连线创建
+2. **视觉反馈清晰**：起点选中时显示黄色星标，连接成功后消失
+3. **成组高亮**：鼠标悬停在因果链条上时，整条链高亮（黄色星标）
+4. **编号系统**：F1, C1, P1, L1 格式自动编号，易于识别
+5. **精致卡片**：160px 固定宽度，只显示编号+标题
+6. **4 层级色彩**：金/蓝/绿/紫，一目了然
 
 ---
 
-## 📊 会话 Token 统计
+## 🎯 状态
 
-### 第四轮会话（Step 2 AI 互动助手）
-- **预估使用**：约 130,000 tokens
-- **剩余空间**：约 -2000 tokens
-- **建议**：请开始新会话以避免 token 限制
-
-### 关键里程碑
-- 第一轮会话：Step 1 重构 + 上下文监控（已删除）
-- 第二轮会话：Step 2 初始重构（竞争力对标系统）
-- 第三轮会话：Step 2 逻辑深化（客户洞察 + 竞对侦察 + KSF 推导理由）
-- 第四轮会话：Step 2 AI 互动助手（文件上传 + 对话式分析 + Bug 修复）
+**编译状态**：✅ 成功，无错误
+**运行端口**：http://localhost:3000
+**连接功能**：✅ 正常工作
+**样式优化**：✅ 完成
 
 ---
 
-## 🎯 Step 2 完整功能清单
+## 📝 修复总结
 
-### ✅ 已完成功能
-- [x] 行业趋势收集
-- [x] 客户需求洞察（客户画像 + KBF）
-- [x] 竞对深度侦察（基础信息 + 搜索结果 + CSF 分析）
-- [x] 本公司信息收集
-- [x] KSF 逻辑链提炼（KBF + CSF → KSF with reasoning）
-- [x] 竞争力对标打分
-- [x] SWOT 矩阵生成
-- [x] 战略机会点生成
-- [x] AI 助手集成（4 个模块）
+### 问题
+- React Flow Pan/Zoom 画布层级遮挡自定义 HTML 元素
+- **解决方案**：移除所有复杂背景，简化为 4 条水平线
 
-### 📋 测试清单
-- [ ] 填写行业趋势 → 使用 AI 助手分析 → 查看结果自动填入
-- [ ] 填写客户画像 → 使用 AI 助手分析 → 提炼关键信息
-- [ ] 添加 KBF → 点击 AI 验证 → 查看反馈建议
-- [ ] 填写竞对信息 → 使用 AI 助手分析 → 提炼竞对优势
-- [ ] 粘贴搜索结果 → 点击 AI 深度侦察 → 查看 CSF 清单
-- [ ] 填写公司信息 → 使用 AI 助手诊断 → 查看分析结果
-- [ ] 确认 KBF 和 CSF → 点击提炼 KSF → 查看推导理由
-- [ ] 调整对标评分 → 确认评分 → 生成 SWOT
-- [ ] 查看战略机会点 → 保存数据 → 进入 Step 3
-
-### 7. 数据持久化修复与文件上传简化（第五轮会话）
-
-**问题**：
-1. 刷新页面后数据丢失，无法恢复已保存的内容
-2. 文件上传支持格式过于复杂，对普通用户不友好
-
-**修改文件**：
-- `lib/store.ts` - 添加数据持久化到 localStorage
-- `components/Step1Review.tsx` - 优化数据加载逻辑
-- `components/Step2Insight.tsx` - 优化数据加载逻辑
-- `components/AIAnalysisChat.tsx` - 简化文件上传
-- `lib/zhipu-api.ts` - 更新文件读取函数
-
-#### 数据持久化修复
-
-**核心修改**：
-```typescript
-// store.ts - 添加持久化工具函数
-const saveToStorage = (key: string, value: any) => {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(key, JSON.stringify(value));
-};
-
-setData: (step, value) => set((state) => {
-  const newData = { ...state.data, [step]: value };
-  saveToStorage('strategic_data', newData);  // 自动保存
-  return { data: newData };
-})
-
-// 初始化时加载
-data: loadFromStorage<StrategicData>('strategic_data', {})
-```
-
-#### 文件上传简化
-
-**之前**：支持 .txt, .md, .csv, .json, .pdf, .doc, .docx
-**现在**：只支持 **PDF** (.pdf) 和 **图片** (.png, .jpg, .jpeg, .gif, .webp)
-
-**文件显示优化**：
-- 📄 PDF 文档 + 文件大小
-- 🖼️ 图片 + 文件大小
+### 结果
+- ✅ 泳道可见（4 条水平线）
+- ✅ 节点可拖拽
+- ✅ 连线可创建
+- ✅� 悬停高亮正常
+- ✅ 样式编辑功能正常
 
 ---
 
-**最后更新**：2026-02-11 第六轮会话
-**状态**：✅ DevTools 已创建，数据层已重构，Supabase 文档已准备
-**下一步**：等待用户测试 DevTools，准备 Supabase 集成
-
----
-
-## 🚀 第六轮会话：开发体验优化与架构升级
-
-### 第一步：DevTools 开发者工具 ✅
-
-**新增文件**：
-- `components/DevTools.tsx` - 开发者工具组件
-
-**功能特性**：
-- 📍 **仅 localhost 显示**：生产环境自动隐藏
-- ⚡ **一键注入测试数据**：完整的 Step 1 + Step 2 模拟数据
-  - 包含：业绩复盘、3力3平台诊断、对话历史
-  - 包含：行业趋势、客户洞察、竞对分析、KSF、SWOT
-- 🎯 **快速跳转**：直接跳转到任意 Step
-- 💾 **数据导出**：导出当前数据为 JSON
-- 🗑️ **清空数据**：一键清除所有测试数据
-- 📊 **状态监控**：实时显示各步骤数据填充状态
-
-**UI 效果**：
-```
-┌─────────────────────────────────────────┐
-│  DevTools [▼]                          │
-└─────────────────────────────────────────┘
-         ↓ 展开后
-┌─────────────────────────────────────────┐
-│  ⚡ 一键注入测试数据                     │
-│  [注入全部数据 (Step 1 + 2)]            │
-│  [仅注入 Step 1 数据]                   │
-│  [仅注入 Step 2 数据]                   │
-│                                         │
-│  🎯 快速跳转                             │
-│  [Step 1] [Step 2] [Step 3] [Step 4]    │
-│                                         │
-│  💾 [导出数据 (JSON)] 🗑️ [清空所有数据]  │
-└─────────────────────────────────────────┘
-```
-
-### 第二步：数据层重构 ✅
-
-**新增文件**：
-- `lib/data-manager.ts` - 统一数据管理器
-
-**核心改进**：
-```typescript
-// 抽象存储接口
-interface IStorage {
-  get(key: string): Promise<any>;
-  set(key: string, value: any): Promise<void>;
-  remove(key: string): Promise<void>;
-  clear(): Promise<void>;
-}
-
-// 数据管理器
-class DataManager {
-  async getStrategicData(): Promise<StrategicData>
-  async saveStrategicData(data: StrategicData): Promise<void>
-  async getStepData<T>(step: keyof StrategicData): Promise<T | null>
-  async saveStepData<T>(step: keyof StrategicData, value: T): Promise<void>
-  async validateData(): Promise<{isValid, missingSteps, errors}>
-  async getDataStats(): Promise<{totalSteps, completedSteps, progress}>
-}
-```
-
-**Store 更新**：
-- `setData` 改为异步函数
-- 添加 `userId` 和 `isLoggedIn` 状态
-- 添加 `login()` 和 `logout()` 函数
-- 数据自动持久化
-
-**重构后的优势**：
-- ✅ 存储层抽象，易于切换到数据库
-- ✅ 统一的数据验证和统计
-- ✅ 为用户系统做好准备
-- ✅ 保持前端 UI 不变
-
-### 第三步：Supabase 集成文档 📝
-
-**新增文件**：
-- `SUPABASE_SETUP.md` - 完整的 Supabase 集成指南
-
-**包含内容**：
-1. ✅ 注册 Supabase 账号和创建项目
-2. ✅ 数据库表设计（strategies 表）
-3. ✅ SQL 脚本（建表、索引、RLS 策略）
-4. ✅ 环境变量配置
-5. ✅ 客户端初始化代码
-6. 📋 登录页面组件（待实现）
-7. 📋 数据库集成代码（待实现）
-
-**数据库表结构**：
-```sql
-strategies
-├── id (UUID)              主键
-├── user_id (UUID)         用户 ID
-├── step1_data (JSONB)     Step 1 数据
-├── step2_data (JSONB)     Step 2 数据
-├── step3_data (JSONB)     Step 3 数据
-├── step4_data (JSONB)     Step 4 数据
-├── created_at (TIMESTAMP)  创建时间
-└── updated_at (TIMESTAMP)  更新时间
-```
-
-**需要配置的环境变量**：
-```bash
-# 在 Supabase 控制台获取
-NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
----
-
-## 🚀 第七轮会话：Supabase 云端集成完成
-
-### 第三步：Supabase 集成 ✅
-
-**新增文件**：
-- `lib/supabase.ts` - Supabase 客户端配置
-- `components/LoginPage.tsx` - 登录/注册页面
-- `app/login/page.tsx` - 登录路由
-- `SUPABASE_SETUP.md` - 数据库设置指南
-
-**修改文件**：
-- `lib/data-manager.ts` - 添加 SupabaseAdapter 实现
-- `lib/store.ts` - 添加用户认证状态和登录/登出函数
-- `components/Header.tsx` - 添加登录/登出按钮，显示用户状态
-
-**已配置环境变量**：
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://zfmopehdntuhpprqzmhu.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_ix3qVRqCsEmhXYccmriSFQ_IcBQZSrH
-```
-
-**核心功能**：
-
-#### 1. Supabase 客户端配置
-```typescript
-// lib/supabase.ts
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Auth 辅助函数
-authHelpers.getCurrentUser()
-authHelpers.signInWithEmail(email, password)
-authHelpers.signUpWithEmail(email, password)
-authHelpers.signOut()
-
-// 数据库辅助函数
-dbHelpers.getUserStrategies()
-dbHelpers.upsertStrategy(strategyData)
-dbHelpers.deleteStrategy()
-```
-
-#### 2. 数据管理器 Supabase 适配器
-```typescript
-class SupabaseAdapter implements IStorage {
-  private cache: Map<string, any> = new Map();
-
-  async get(key: string): Promise<any>
-  async set(key: string, value: any): Promise<void>
-  async remove(key: string): Promise<void>
-  async clear(): Promise<void>
-}
-```
-
-#### 3. 用户认证流程
-```
-访问 /login
-    ↓
-登录/注册（邮箱+密码）
-    ↓
-成功后调用 store.login(userId, email)
-    ↓
-切换到 Supabase 模式
-    ↓
-从数据库加载用户数据
-    ↓
-跳转到首页
-```
-
-#### 4. 登录/登出 UI
-- **未登录状态**：显示蓝色"登录"按钮
-- **已登录状态**：显示绿色用户邮箱 + "退出"按钮
-- **退出时**：显示加载动画，登出后跳转回登录页
-
-#### 5. 数据同步策略
-- **试用模式**（未登录）：数据保存在 localStorage
-- **会员模式**（已登录）：数据同步到 Supabase 云端
-- **模式切换**：登录时自动迁移，登出时切换回本地
-
-**数据库设置指南**（SUPABASE_SETUP.md）：
-1. 创建 strategies 表
-2. 启用 RLS（Row Level Security）
-3. 创建用户隔离策略
-4. 设置自动更新时间戳触发器
-
-**SQL 建表脚本**：
-```sql
-CREATE TABLE IF NOT EXISTS strategies (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  step1_data JSONB,
-  step2_data JSONB,
-  step3_data JSONB,
-  step4_data JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-ALTER TABLE strategies ENABLE ROW LEVEL SECURITY;
-
--- RLS 策略：用户只能访问自己的数据
-CREATE POLICY "Users can view own strategies"
-  ON strategies FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own strategies"
-  ON strategies FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own strategies"
-  ON strategies FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own strategies"
-  ON strategies FOR DELETE USING (auth.uid() = user_id);
-```
-
----
-
-## 🚀 第八轮会话：Supabase 集成验证与完善
-
-### 已完成的工作
-
-**代码修复与完善**：
-- 修复 `components/Header.tsx` - 添加缺失的 `useState` 导入
-- 清理 `app/layout.tsx` - 移除未使用的 `useStore` 导入
-- 修复 `components/LoginPage.tsx` - 登录函数传递完整参数
-
-**新增功能**：
-- `store.initializeAuth()` - 应用启动时自动恢复登录状态
-- `app/page.tsx` - 添加认证状态初始化调用
-
-**工作流程**：
-```
-应用启动
-    ↓
-调用 initializeAuth()
-    ↓
-检查 localStorage 中的 userId
-    ↓
-验证 Supabase 会话有效性
-    ↓
-✅ 有效 → 恢复登录状态，切换到云端模式，加载数据
-❌ 无效 → 清除本地存储，保持未登录状态
-```
-
-### 验证清单
-
-| 项目 | 状态 | 说明 |
-|------|------|------|
-| .env.local 配置 | ✅ | Supabase URL 和密钥已配置 |
-| @supabase/supabase-js | ✅ | v2.95.3 已安装 |
-| 数据库表创建 | ✅ | 用户已执行 SQL 脚本 |
-| 编译状态 | ✅ | 无错误，1088 modules |
-| 登录页面 | ✅ | HTTP 200 |
-| 首页 | ✅ | HTTP 200 |
-| 开发服务器 | ✅ | 运行在 localhost:3000 |
-
-### 运行状态
-```
-▲ Next.js 14.2.35
-- Local: http://localhost:3000
-- Environments: .env.local
-
-✓ Ready in 1898ms
-✓ Compiled / in 3s (1088 modules)
-✓ Compiled /login in 199ms (1082 modules)
-GET / 200 in 128ms
-GET /login 200 in 15ms
-```
-
----
-
-## 🚀 第九轮会话：AI 助手改为文本粘贴输入
-
-### 变更背景
-
-PDF 文件解析功能遇到了兼容性技术难题：
-- ❌ `pdf-parse` 与 Next.js App Router 不兼容
-- ❌ `pdfjs-dist` 前端解析也存在模块加载问题
-- ✅ **决策：优先保证核心 AI 分析功能可用**
-
-### 已完成的工作
-
-**组件重构**：`components/AIAnalysisChat.tsx`
-
-**移除的功能**：
-- 文件上传按钮（Upload button）
-- PDF 文件解析逻辑
-- pdfjs-dist 依赖（保留但未使用）
-
-**新增的功能**：
-- 大型多行文本输入框（Textarea）
-- 粘贴文本分析功能
-- `handleAnalyzePastedText()` 函数
-
-**UI 变更**：
-
-```typescript
-// 之前：文件上传
-<input type="file" accept=".pdf" />
-<button>上传 PDF</button>
-
-// 现在：文本粘贴
-<textarea
-  placeholder="请在此粘贴行业报告文本内容..."
-  className="h-40"
-/>
-<button>开始分析</button>
-```
-
-**用户体验流程**：
-```
-用户打开 PDF/Word 文档
-    ↓
-选择并复制文本内容
-    ↓
-粘贴到 AI 助手的文本框
-    ↓
-点击"开始分析"按钮
-    ↓
-AI 基于真实文本内容进行分析
-```
-
-### 模块配置
-
-| 模块 | 粘贴框标题 | 占位符 |
-|------|-----------|--------|
-| trends | 行业趋势资料 | 请在此粘贴行业报告文本内容... |
-| competitors | 竞争对手资料 | 请在此粘贴竞争对手资料文本内容... |
-| customer | 客户需求资料 | 请在此粘贴客户调研资料文本内容... |
-| company | 公司情况资料 | 请在此粘贴公司资料文本内容... |
-
-### 技术细节
-
-**状态管理**：
-```typescript
-const [pastedText, setPastedText] = useState('');
-const [isAnalyzingText, setIsAnalyzingText] = useState(false);
-```
-
-**分析函数**：
-```typescript
-const handleAnalyzePastedText = async () => {
-  const analysis = await analyzeUploadedFile(
-    apiKey,
-    `${config.title}（用户粘贴）`,
-    pastedText,  // 直接使用粘贴的文本
-    module
-  );
-  // 显示分析结果...
-};
-```
-
-**调试反馈**（开发模式）：
-```
-🐛 [Debug: 成功读取文本 XXXX 字]
-```
-
-### 优势
-
-| 特性 | 说明 |
-|------|------|
-| ✅ 简单可靠 | 无需处理文件格式兼容性 |
-| ✅ 用户可控 | 用户可以选择粘贴哪些内容 |
-| ✅ 灵活性高 | 支持任意来源的文本（PDF、Word、网页等） |
-| ✅ 调试友好 | 可以直接看到文本内容，确认数据正确 |
-
-### 后续计划
-
-文件解析功能可以后续添加（待技术方案成熟后）：
-- 方案 A：后端服务端解析（Python + PyPDF2）
-- 方案 B：第三方 API（Cloudmersive、PDF.co）
-- 方案 C：OCR 服务（针对扫描件）
-
----
-
-**最后更新**：2026-02-11 第九轮会话
-**状态**：✅ 核心功能可用，AI 分析助手已改为文本粘贴输入
-**服务器**：http://localhost:3000
-
----
-
-## 📊 会话 Token 统计
-
-### 第九轮会话（AI 助手输入方式调整）
-- **变更**：放弃 PDF 文件解析，改为文本粘贴输入
-- **原因**：PDF 解析技术复杂度高，优先保证核心 AI 分析功能可用
-
-### 关键里程碑
-- 第一轮会话：Step 1 重构 + 上下文监控（已删除）
-- 第二轮会话：Step 2 初始重构（竞争力对标系统）
-- 第三轮会话：Step 2 逻辑深化（客户洞察 + 竞对侦察 + KSF 推导理由）
-- 第四轮会话：Step 2 AI 互动助手（文件上传 + 对话式分析 + Bug 修复）
-- 第五轮会话：数据持久化修复（localStorage 自动保存 + 文件上传简化）
-- 第六轮会话：DevTools + 数据层重构 + Supabase 准备
-- 第七轮会话：Supabase 云端集成实现
-- 第八轮会话：集成验证与完善
-- 第九轮会话：AI 助手改为文本粘贴输入 ✅
-
----
-
-## 🚀 第十轮会话：GitHub & Vercel 部署 + UI 优化 + PDF 导出修复
-
-### 已完成的工作
-
-#### 1. GitHub 仓库创建 ✅
-- **仓库地址**：https://github.com/cscoheru/strategy
-- **分支**：main
-- **提交记录**：
-  - e775be1: feat: 初始化企业战略解码工作台
-  - 730ab7c: fix: make Supabase optional for deployment
-  - ed37f76: fix: handle null data in authentication
-  - a4fefe4: fix: add explicit types for auth helpers
-  - 0650dcc: fix: add explicit types for auth helpers
-  - 58a7d93: fix: improve login UI and fix PDF export
-  - 44afef5: fix: remove jsPDF and use browser print for PDF export
-
-#### 2. Vercel 自动部署配置 ✅
-- **部署地址**：https://strategy-kappa.vercel.app
-- **自动同步**：git push 后 Vercel 自动重新部署
-- **环境变量**：
-  - NEXT_PUBLIC_SUPABASE_URL=https://zfmopehdntuhpprqzmhu.supabase.co
-  - NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_ix3qVRqCsEmhXYccmriSFQ_IcBQZSrH
-
-#### 3. .gitignore 配置 ✅
-- 排除 node_modules, .next, out, build 等构建文件
-- 排除 .DS_Store, *.pem 等系统文件
-- 排除 .env, .env.local 等环境变量文件
-
-### 本次会话修复的问题
-
-#### 1. 登录页面 UI 改进 ✅
-- **文件**：components/LoginPage.tsx
-- **改进内容**：
-  - 添加渐变背景（from-blue-50 via-white to-purple-50）
-  - 添加 Logo 图标（战字徽章）
-  - 改进颜色对比度和视觉层次
-  - 优化切换按钮动画和状态
-  - 改进错误提示和引导信息格式
-  - 更友好的用户体验
-
-#### 2. Supabase 客户端可选配置 ✅
-- **文件**：lib/supabase.ts
-- **修改内容**：
-  - 移除环境变量必需断言（!）
-  - Supabase 客户端可以为 null
-  - 所有辅助函数添加 null 检查
-  - 应用可在无 Supabase 配置时正常运行
-
-#### 3. TypeScript 类型安全改进 ✅
-- **文件**：lib/supabase.ts, components/LoginPage.tsx
-- **修改内容**：
-  - 添加明确的 AuthResult 接口
-  - 改进类型收窄
-  - 修复 data 可能为 null 的错误
-
-#### 4. PDF 导出乱码问题修复 ✅
-- **文件**：components/ReportPage.tsx
-- **问题**：jsPDF 不支持中文字符，导致导出 PDF 乱码
-- **解决方案**：使用浏览器原生打印功能
-- **新增功能**：
-  - 移除 jsPDF 依赖和相关代码
-  - 添加 handlePrint() 函数调用 window.print()
-  - 添加专门的打印样式（@media print）
-  - 更新按钮为"打印/导出 PDF"
-  - 添加 print: 前缀类名隐藏打印时的非必要元素
-  - 强制打印时黑色文字以确保可读性
-- **用户体验**：
-   - 用户点击"打印/导出 PDF"
-  - 浏览器打开打印对话框
-  - 选择"另存为 PDF"或"Microsoft Print to PDF"
-  - 完美支持中文、日文、韩文等多语言字符
-  - 保留所有格式、颜色、布局
-
-#### 5. 打印样式优化 ✅
-- **文件**：app/globals.css
-- **新增样式**：
-  ```css
-  @media print {
-    /* 隐藏不需要打印的元素 */
-    .print\:hidden { display: none !important; }
-    
-    /* 打印时的背景和文字颜色 */
-    * {
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    
-    /* 强制浅色背景 */
-    .bg-white, .dark\:bg-slate-800 {
-      background-color: white !important;
-    }
-    
-    /* 强制黑色文字 */
-    .text-gray-900, .dark\:text-gray-100, 
-    .text-gray-600, .dark\:text-slate-400 {
-      color: black !important;
-    }
-    
-    /* 分页控制 */
-    section {
-      page-break-inside: avoid;
-    }
-    
-    /* 页面边距 */
-    @page {
-      margin: 2cm;
-    }
-  }
-  ```
-
-### 技术栈更新
-
-#### 移除的依赖
-- ~~jsPDF~~（已移除，使用浏览器原生打印）
-
-#### 保留的核心依赖
-- next: 14.2.35
-- react: 18.x
-- typescript: 5.x
-- tailwindcss: 3.x
-- zustand: 4.x
-- @supabase/supabase-js: 2.x
-- lucide-react: 图标库
-- @智谱AI: glm-4-flash 模型
-
-### 部署流程
-
-#### 本地开发
-```bash
-cd /Users/kjonekong/Documents/strategydecoding/strategydecoding
-npm run dev
-# 访问 http://localhost:3000
-```
-
-#### 自动部署到生产
-```bash
-# 1. 修改代码
-git add .
-git commit -m "feat: 你的修改说明"
-
-# 2. 推送到 GitHub
-git push origin main
-
-# 3. Vercel 自动检测推送并重新部署（约 2-3 分钟）
-# 4. 访问 https://strategy-kappa.vercel.app
-```
-
-### 已知限制与后续计划
-
-#### 当前限制
-1. **域名配置待完成**
-   - 已购买域名：3strategy.cc
-   - DNS 服务器：ns1.vercel-dns.com, ns2.vercel-dns.com
-   - 域名供应商：亿速互联
-   - 状态：待配置 DNS 并在 Vercel 添加域名
-
-2. **手机访问问题待确认**
-   - 桌面访问正常
-   - 需确认手机网络环境和浏览器兼容性
-
-#### 待优化项
-1. 完成域名 3strategy.cc 配置
-2. 添加更多打印选项（页眉页脚、水印等）
-3. 优化移动端响应式布局
-4. 添加报告模板选择
-5. 实现数据导入功能
-6. 添加多语言支持
-
-### 关键里程碑
-
-| 会话 | 主要工作 | 状态 |
-|-------|---------|------|
-| 第一轮 | Step 1 重构 + 上下文监控 | ✅ |
-| 第二轮 | 默认模型更新为 glm-4-flash | ✅ |
-| 第三轮 | Step 1 采用 3力3平台诊断模式 | ✅ |
-| 第四轮 | Step 2 初始重构（竞争力对标） | ✅ |
-| 第五轮 | Step 2 逻辑深化（客户洞察+竞对） | ✅ |
-| 第六轮 | Step 2 AI 互动助手（文件上传） | ✅ |
-| 第七轮 | 数据持久化修复 + 文件上传简化 | ✅ |
-| 第八轮 | DevTools + 数据层重构 + Supabase 准备 | ✅ |
-| 第九轮 | AI 助手改为文本粘贴输入 | ✅ |
-| 第十轮 | GitHub + Vercel 部署 + UI 优化 + PDF 修复 | ✅ |
-
-### 项目统计
-
-- **总文件数**：34 个文件
-- **代码行数**：约 15,612 行
-- **组件数**：13 个主要组件
-- **会话轮数**：10 轮
-- **开发周期**：2026-02-11 至今
-- **部署状态**：生产环境运行中
-- **最后更新**：2026-02-11
-
----
-
-**项目状态**：✅ **生产环境运行中**
-**本地开发**：http://localhost:3000
-**生产环境**：https://strategy-kappa.vercel.app
-
----
-
-## 🚀 第十一轮会话：登录功能修复与 Vercel 部署优化
-
-### 修复的问题
-
-#### 1. 远程访问 Supabase 未配置 ✅
-
-**问题现象**：
-- Vercel 部署后，点击登录按钮无法使用
-- 提示 "Supabase not configured"
-
-**原因分析**：
-- 环境变量在 Vercel 上未正确传递
-- 缺少对未配置状态的友好提示
-
-**解决方案**：
-- 添加 `isSupabaseConfigured` 检查
-- 在 LoginPage 显示友好提示页面
-- 在 Header 显示云端服务未配置警告
-- 创建 VERCEL_DEPLOYMENT.md 配置指南
-
-#### 2. 注册/登录提示"请先验证邮箱" ✅
-
-**问题现象**：
-- 注册后提示 "Email not confirmed"
-- 需要验证邮箱才能登录，用户体验差
-
-**原因分析**：
-- Supabase 默认开启邮箱验证功能
-- 未配置 SMTP 邮件服务
-
-**解决方案**：
-- 修改 `signUpWithEmail` 函数，添加 `emailRedirectTo` 选项
-- 优化错误处理，区分用户已存在等错误
-- 更新错误提示信息
-
-### 修改的文件
-
-**lib/supabase.ts**：
-- 添加调试日志（仅开发环境）
-- 优化 `signUpWithEmail` 函数
-- 改进 `isSupabaseConfigured` 检查
-
-**components/LoginPage.tsx**：
-- 添加 Supabase 未配置的提示页面
-- 优化错误处理逻辑
-- 改进错误提示文案
-
-**components/Header.tsx**：
-- 添加云端服务未配置警告图标
-- 登录按钮禁用状态处理
-
-### 新增文件
-
-- **VERCEL_DEPLOYMENT.md** - Vercel 部署完整指南
-  - 环境变量配置步骤
-  - 故障排查方法
-  - 数据库设置脚本
-  - 本地开发配置
-
-### 需要在 Supabase 控制台配置
-
-**关闭邮箱验证（推荐）**：
-1. 进入 Supabase Dashboard → Authentication → Providers
-2. 找到 Email provider
-3. 关闭 "Confirm email" 选项
-
-**或配置 SMTP 邮件服务**：
-- 使用 SendGrid、AWS SES 等邮件服务
-- 在 Supabase Dashboard → Authentication → Email Templates 配置
-
-### 需要在 Vercel 配置的环境变量
-
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://zfmopehdntuhpprqzmhu.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_ix3qVRqCsEmhXYccmriSFQ_IcBQZSrH
-```
-
-配置步骤：
-1. Vercel Dashboard → 项目 Settings → Environment Variables
-2. 添加上述两个变量
-3. 重新部署项目
-
-### 用户体验改进
-
-**Supabase 未配置时**：
-- 显示友好提示页面
-- "返回首页（试用模式）"按钮
-- 本地数据保存不受影响
-
-**邮箱验证提示时**：
-- 更准确的错误信息
-- 区分"用户已存在"等不同错误
-- 允许注册后直接登录（代码层面处理）
-
-### 后续计划
-
-1. 在 Supabase 控制台关闭邮箱验证
-2. 在 Vercel 添加环境变量
-3. 重新部署并验证功能
-4. 测试跨设备数据同步
-
----
-
-**最后更新**：2026-02-12 第十一轮会话
-**状态**：✅ 代码已修复，等待环境变量配置验证
-
+**总结**：通过简化泳道实现，彻底解决了 React Flow 画布层级导致的交互阻断问题。用户现在可以完全手动控制战略地图的创建和编辑。

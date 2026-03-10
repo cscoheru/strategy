@@ -54,7 +54,7 @@ export default function ReportPage() {
     if (data.step4) {
       report += '## 四、执行方案\n\n';
 
-      if (data.step4?.keyBattles?.length > 0) {
+      if (data.step4?.keyBattles && data.step4.keyBattles.length > 0) {
         report += '**关键战役:**\n';
         data.step4.keyBattles.forEach((battle, idx) => {
           report += `${idx + 1}. **${battle.name}** - ${battle.owner}\n`;
@@ -62,10 +62,11 @@ export default function ReportPage() {
         });
       }
 
-      if (data.step4?.quarterlyActions && data.step4.quarterlyActions.length > 0) {
+      if (data.step4?.quarterlyActions && data.step4.quarterlyActions?.length > 0) {
+        const actionsList = data.step4.quarterlyActions;
         report += '**季度行动计划:**\n';
         ['Q1', 'Q2', 'Q3', 'Q4'].forEach(quarter => {
-          const actions = data.step4!.quarterlyActions.filter(a => a.quarter === quarter);
+          const actions = actionsList.filter(a => a.quarter === quarter);
           if (actions.length > 0) {
             report += `\n**${quarter}:**\n`;
             actions.forEach(action => {
@@ -243,12 +244,14 @@ export default function ReportPage() {
                     </div>
                   </div>
                 )}
-                {data.step4?.quarterlyActions && data.step4.quarterlyActions.length > 0 && (
-                  <div>
-                    <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 print:text-black">季度行动计划</h5>
-                    <div className="space-y-4">
-                      {['Q1', 'Q2', 'Q3', 'Q4'].map(quarter => {
-                        const actions = data.step4!.quarterlyActions.filter(a => a.quarter === quarter);
+                {data.step4?.quarterlyActions && data.step4.quarterlyActions.length > 0 && (() => {
+                  const actionsList = data.step4.quarterlyActions;
+                  return (
+                    <div>
+                      <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 print:text-black">季度行动计划</h5>
+                      <div className="space-y-4">
+                        {['Q1', 'Q2', 'Q3', 'Q4'].map(quarter => {
+                          const actions = actionsList.filter(a => a.quarter === quarter);
                         if (actions.length === 0) return null;
                         return (
                           <div key={quarter}>
@@ -265,7 +268,8 @@ export default function ReportPage() {
                       })}
                     </div>
                   </div>
-                )}
+                  );
+                })()}
               </div>
             </section>
           )}

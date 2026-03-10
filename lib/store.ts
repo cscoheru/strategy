@@ -59,7 +59,7 @@ export const useStore = create<AppState>((set, get) => ({
   currentStep: 1,
   showWelcome: true,
   showSettings: false,
-  data: loadFromStorage<StrategicData>('strategic_data', {}),
+  data: loadFromStorage<StrategicData>('strategic_data', { step1: {} as any, step2: {} as any }),
   isDarkMode: typeof window !== 'undefined' && localStorage.getItem('dark_mode') === 'true',
   modelConfig: loadFromStorage<ModelConfig>('model_config', defaultModelConfig),
   companyInfo: loadFromStorage<CompanyInfo>('company_info', { name: '', industry: '' }),
@@ -111,7 +111,7 @@ export const useStore = create<AppState>((set, get) => ({
   clearData: async () => {
     const dataManager = getDataManager();
     await dataManager.clearStrategicData();
-    set({ data: {} });
+    set({ data: { step1: {} as any, step2: {} as any } });
   },
 
   // 用户登录
@@ -151,7 +151,7 @@ export const useStore = create<AppState>((set, get) => ({
       userId: null,
       isLoggedIn: false,
       userEmail: null,
-      data: {} // 清空数据
+      data: { step1: {} as any, step2: {} as any } // 清空数据
     });
   },
 

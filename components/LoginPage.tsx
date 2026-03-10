@@ -14,26 +14,58 @@ import {
   Loader2,
   AlertCircle,
   CloudOff,
-  Home
+  Home,
+  ArrowLeft,
+  CheckCircle
 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useStore();
 
-  const [isLogin, setIsLogin] = useState(true);
+  type ViewMode = 'login' | 'register' | 'forgot-password' | 'reset-password';
+  const [viewMode, setViewMode] = useState<ViewMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  // 检查是否已登录
+  // 检查是否已登录，并检查 URL 参数
   useEffect(() => {
     const checkAuth = async () => {
       if (!isSupabaseConfigured) return;
+
+      // 检查 URL 参数中的错误信息
+      const params = new URLSearchParams(window.location.search);
+      const errorCode = params.get('error_code');
+      const errorDesc = params.get('error_description');
+      const isReset = params.get('reset');
+
+      // 处理错误
+      if (errorCode === 'otp_expired') {
+        setError('重置链接已过期，请重新申请密码重置');
+        setViewMode('forgot-password');
+      } else if (errorCode) {
+        setError(decodeURIComponent(errorDesc || '重置密码失败，请重试'));
+        if (isReset === 'true') {
+          setViewMode('forgot-password');
+        }
+      }
+      // 处理密码重置模式
+      else if (isReset === 'true') {
+        setViewMode('reset-password');
+        setSuccessMessage('请输入您的新密码');
+      }
+
+      // 检查用户登录状态
       const user = await authHelpers.getCurrentUser();
-      if (user) {
+      if (user && !isReset) {
         await login(user.id, user.email || '');
         router.push('/');
       }
@@ -72,10 +104,41 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
     setIsLoading(true);
 
     try {
-      if (isLogin) {
+      if (viewMode === 'forgot-password') {
+        // 忘记密码 - 发送重置邮件
+        const result = await authHelpers.resetPassword(email);
+        if (result.error) {
+          throw new Error(result.error.message || '发送重置邮件失败，请重试');
+        }
+        setSuccessMessage('密码重置邮件已发送到您的邮箱，请查收邮件并按提示重置密码。');
+      } else if (viewMode === 'reset-password') {
+        // 重置密码 - 验证并更新密码
+        if (newPassword.length < 6) {
+          throw new Error('密码长度至少为 6 位');
+        }
+        if (newPassword !== confirmPassword) {
+          throw new Error('两次输入的密码不一致');
+        }
+
+        const result = await authHelpers.updatePassword(newPassword);
+        if (result.error) {
+          throw new Error(result.error.message || '密码重置失败，请重试');
+        }
+
+        setSuccessMessage('密码重置成功！请使用新密码登录。');
+        // 3秒后切换到登录模式
+        setTimeout(() => {
+          setViewMode('login');
+          setSuccessMessage('');
+          setPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+        }, 3000);
+      } else if (viewMode === 'login') {
         // 登录
         const result = await authHelpers.signInWithEmail(email, password);
         if (result.error || !result.data?.user) {
@@ -84,7 +147,7 @@ export default function LoginPage() {
 
         await login(result.data.user.id, email);
         router.push('/');
-      } else {
+      } else if (viewMode === 'register') {
         // 注册
         const result = await authHelpers.signUpWithEmail(email, password);
         if (result.error) {
@@ -132,37 +195,55 @@ export default function LoginPage() {
             企业战略解码工作台
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            {isLogin ? '登录以同步您的战略数据' : '创建账号开始使用'}
+            {viewMode === 'forgot-password'
+              ? '重置您的密码'
+              : viewMode === 'reset-password'
+              ? '设置新密码'
+              : viewMode === 'login'
+              ? '登录以同步您的战略数据'
+              : '创建账号开始使用'}
           </p>
         </div>
 
         {/* 登录/注册表单 */}
         <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm rounded-2xl shadow-xl border border-gray-200 dark:border-slate-700 p-8">
-          {/* 切换按钮 */}
-          <div className="flex bg-gray-100 dark:bg-slate-700 rounded-lg p-1 mb-6">
-            <button
-              onClick={() => setIsLogin(true)}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
-                isLogin
-                  ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-600'
-              }`}
-            >
-              <LogIn className="w-4 h-4 inline mr-2" />
-              登录
-            </button>
-            <button
-              onClick={() => setIsLogin(false)}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
-                !isLogin
-                  ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-600'
-              }`}
-            >
-              <UserPlus className="w-4 h-4 inline mr-2" />
-              注册
-            </button>
-          </div>
+          {/* 切换按钮（忘记密码和重置密码模式时隐藏） */}
+          {viewMode !== 'forgot-password' && viewMode !== 'reset-password' && (
+            <div className="flex bg-gray-100 dark:bg-slate-700 rounded-lg p-1 mb-6">
+              <button
+                onClick={() => setViewMode('login')}
+                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  viewMode === 'login'
+                    ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-600'
+                }`}
+              >
+                <LogIn className="w-4 h-4 inline mr-2" />
+                登录
+              </button>
+              <button
+                onClick={() => setViewMode('register')}
+                className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  viewMode === 'register'
+                    ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-600'
+                }`}
+              >
+                <UserPlus className="w-4 h-4 inline mr-2" />
+                注册
+              </button>
+            </div>
+          )}
+
+          {/* 成功提示 */}
+          {successMessage && (
+            <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg animate-fade-in">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                <p className="text-sm text-green-700 dark:text-green-300 font-medium">{successMessage}</p>
+              </div>
+            </div>
+          )}
 
           {/* 错误提示 */}
           {error && (
@@ -197,34 +278,109 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* 密码输入 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                密码
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="•••••••••"
-                  required
-                  minLength={6}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-slate-600 rounded-lg
-                             bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100
-                             focus:outline-none focus:ring-2 focus:ring-primary-500
-                             placeholder:text-gray-400 dark:placeholder:text-slate-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
+            {/* 密码输入（忘记密码和重置密码模式时隐藏） */}
+            {viewMode !== 'forgot-password' && viewMode !== 'reset-password' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  密码
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="•••••••••"
+                    required
+                    minLength={6}
+                    className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-slate-600 rounded-lg
+                               bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100
+                               focus:outline-none focus:ring-2 focus:ring-primary-500
+                               placeholder:text-gray-400 dark:placeholder:text-slate-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {/* 忘记密码链接（仅在登录模式显示） */}
+                {viewMode === 'login' && (
+                  <div className="mt-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('forgot-password')}
+                      className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium transition-colors"
+                    >
+                      忘记密码？
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
+
+            {/* 重置密码模式：新密码输入 */}
+            {viewMode === 'reset-password' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    新密码
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="输入新密码（至少6位）"
+                      required
+                      minLength={6}
+                      className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-slate-600 rounded-lg
+                                 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100
+                                 focus:outline-none focus:ring-2 focus:ring-primary-500
+                                 placeholder:text-gray-400 dark:placeholder:text-slate-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    确认新密码
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="再次输入新密码"
+                      required
+                      minLength={6}
+                      className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-slate-600 rounded-lg
+                                 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100
+                                 focus:outline-none focus:ring-2 focus:ring-primary-500
+                                 placeholder:text-gray-400 dark:placeholder:text-slate-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* 提交按钮 */}
             <button
@@ -236,15 +392,48 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  {isLogin ? '登录中...' : '注册中...'}
+                  {viewMode === 'forgot-password'
+                    ? '发送中...'
+                    : viewMode === 'reset-password'
+                    ? '重置中...'
+                    : viewMode === 'login'
+                    ? '登录中...'
+                    : '注册中...'}
                 </>
               ) : (
                 <>
-                  {isLogin ? <LogIn className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
-                  {isLogin ? '登录' : '创建账号'}
+                  {viewMode === 'forgot-password' ? (
+                    <Mail className="w-5 h-5" />
+                  ) : viewMode === 'reset-password' ? (
+                    <Lock className="w-5 h-5" />
+                  ) : viewMode === 'login' ? (
+                    <LogIn className="w-5 h-5" />
+                  ) : (
+                    <UserPlus className="w-5 h-5" />
+                  )}
+                  {viewMode === 'forgot-password'
+                    ? '发送重置邮件'
+                    : viewMode === 'reset-password'
+                    ? '重置密码'
+                    : viewMode === 'login'
+                    ? '登录'
+                    : '创建账号'}
                 </>
               )}
             </button>
+
+            {/* 返回登录按钮（忘记密码和重置密码模式） */}
+            {(viewMode === 'forgot-password' || viewMode === 'reset-password') && (
+              <button
+                type="button"
+                onClick={() => setViewMode('login')}
+                className="w-full py-3 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600
+                           text-gray-700 dark:text-gray-300 font-semibold rounded-lg flex items-center justify-center gap-2 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                返回登录
+              </button>
+            )}
           </form>
 
           {/* 提示信息 */}

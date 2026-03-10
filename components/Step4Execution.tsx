@@ -2,320 +2,217 @@
 
 import { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { Step4Data, Target } from '@/types/strategy';
-import { generateExecutionMap } from '@/lib/ai-api';
-import { Sparkles, Save, ArrowLeft, ArrowRight, Edit2, Check, MapPin, Calendar } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save } from 'lucide-react';
+import type { Step3Data } from '@/types/strategy';
+import { BSCBoard, type CapsuleData } from './bsc/bsc-board';
+import { SimpleAIAssistant } from './bsc/SimpleAIAssistant';
 
 export default function Step4Execution() {
-  const { data, setData, modelConfig, setStep } = useStore();
-  const [keyBattles, setKeyBattles] = useState(data.step4?.keyBattles || []);
-  const [quarterlyActions, setQuarterlyActions] = useState(data.step4?.quarterlyActions || []);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const { data, setData, setStep } = useStore();
+  const [isReady, setIsReady] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    if (data.step4) {
-      setKeyBattles(data.step4.keyBattles || []);
-      setQuarterlyActions(data.step4.quarterlyActions || []);
+    // Initialize step 4 data if needed
+    if (!data.step4) {
+      setData('step4', {
+        bscCards: [],
+        bscConfirmed: false,
+        actionPlanTable: [],
+        strategyMap: null,
+      });
     }
-  }, [data.step4]);
+    setIsReady(true);
+  }, [data.step4, setData]);
 
-  const handleGenerate = async () => {
-    if (!modelConfig.apiKey) {
-      alert('请先在设置中配置 AI API Key');
-      return;
-    }
-    if (!data.step3?.targets || data.step3.targets.length === 0) {
-      alert('请先设定目标');
-      return;
+  // Load data from Step 1-3 to initialize BSC lanes
+  const getInitialLanesFromStep3 = (): CapsuleData[] => {
+    const step1 = data.step1;
+    const step2 = data.step2;
+    const step3 = data.step3 as Step3Data;
+
+    const capsules: CapsuleData[] = [];
+
+    // 财务层面：从 Step 3 的 calculatedTargets 初始化
+    if (step3?.calculatedTargets) {
+      const { base, standard, challenge } = step3.calculatedTargets;
+
+      // 保底目标 → 财务层面
+      if (base && base > 0) {
+        capsules.push({
+          id: `cap_financial_base_${Date.now()}`,
+          text: `保底: ${base}`,
+          x: 20 + Math.random() * 200,
+          y: 20 + Math.random() * 40,
+          shape: 'capsule',
+          fillColor: 'hsl(0, 84%, 95%)',
+          borderColor: 'hsl(0, 70%, 80%)'
+        });
+      }
+
+      // 达标目标 → 财务层面
+      if (standard && standard > 0) {
+        capsules.push({
+          id: `cap_financial_standard_${Date.now()}`,
+          text: `达标: ${standard}`,
+          x: 20 + Math.random() * 200,
+          y: 20 + Math.random() * 40,
+          shape: 'capsule',
+          fillColor: 'hsl(0, 84%, 95%)',
+          borderColor: 'hsl(0, 70%, 80%)'
+        });
+      }
+
+      // 挑战目标 → 财务层面
+      if (challenge && challenge > 0) {
+        capsules.push({
+          id: `cap_financial_challenge_${Date.now()}`,
+          text: `挑战: ${challenge}`,
+          x: 20 + Math.random() * 200,
+          y: 20 + Math.random() * 40,
+          shape: 'capsule',
+          fillColor: 'hsl(0, 84%, 95%)',
+          borderColor: 'hsl(0, 70%, 80%)'
+        });
+      }
     }
 
-    setIsGenerating(true);
-    try {
-      const result = await generateExecutionMap(modelConfig, data.step3.targets);
-      setKeyBattles(result.keyBattles);
-      setQuarterlyActions(result.quarterlyActions);
-    } catch (error: any) {
-      alert(`生成失败: ${error.message || '请检查 API 配置是否正确'}`);
-    } finally {
-      setIsGenerating(false);
+    // 客户层面：从 step2.companyInfo 初始化
+    if (step2?.companyInfo) {
+      const companyName = typeof step2.companyInfo === 'string' ? step2.companyInfo : (step2.companyInfo as any)?.name || '公司';
+      capsules.push({
+        id: `cap_customer_company_${Date.now()}`,
+        text: `公司: ${companyName}`,
+        x: 20 + Math.random() * 300,
+        y: 20 + Math.random() * 40,
+        shape: 'capsule',
+        fillColor: 'hsl(217, 80%, 97%)',
+        borderColor: 'hsl(215, 60%, 75%)'
+      });
     }
+
+    // 内部流程和学习成长：从 step1.dimensions 初始化
+    if (step1?.dimensions && step1.dimensions.length > 0) {
+      step1.dimensions.forEach((dim, index) => {
+        const layerType = index < 3 ? 'process' : 'learning'; // 前3个是流程，后1个是学习
+        capsules.push({
+          id: `cap_${layerType}_${dim.id}_${Date.now()}`,
+          text: dim.name,
+          x: 20 + Math.random() * 300,
+          y: 20 + Math.random() * 40,
+          shape: 'capsule',
+          fillColor: layerType === 'process'
+            ? 'hsl(142, 70%, 95%)'
+            : 'hsl(270, 80%, 97%)',
+          borderColor: layerType === 'process'
+            ? 'hsl(142, 60%, 75%)'
+            : 'hsl(270, 60%, 80%)'
+        });
+      });
+    }
+
+    return capsules;
   };
 
-  const handleSave = () => {
-    const step4Data: Step4Data = { keyBattles, quarterlyActions };
-    setData('step4', step4Data);
-    alert('数据已保存');
-  };
+  if (!isReady) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-900">
+        <div className="text-gray-500 dark:text-slate-400">加载中...</div>
+      </div>
+    );
+  }
 
-  const handleNext = () => {
-    if (keyBattles.length === 0 && quarterlyActions.length === 0) {
-      alert('请先生成作战地图');
-      return;
-    }
-    handleSave();
-    setStep('report');
-  };
-
-  const handlePrev = () => {
-    handleSave();
+  const handleBack = async () => {
     setStep(3);
   };
 
-  const updateKeyBattle = (index: number, field: string, value: string) => {
-    const newBattles = [...keyBattles];
-    (newBattles[index] as any)[field] = value;
-    setKeyBattles(newBattles);
+  const handleNext = async () => {
+    setStep('report');
   };
 
-  const updateQuarterlyAction = (index: number, field: string, value: string) => {
-    const newActions = [...quarterlyActions];
-    (newActions[index] as any)[field] = value;
-    setQuarterlyActions(newActions);
+  const handleSave = async () => {
+    // Save will be triggered by BSCBoard's onSave callback
+    // For now, just mark as saved
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  // Prepare BSC data for AI assistant
+  const initialCapsules = getInitialLanesFromStep3();
+  const bscData = {
+    financial: initialCapsules.filter(c => c.id.includes('financial')),
+    customer: initialCapsules.filter(c => c.id.includes('customer')),
+    process: initialCapsules.filter(c => c.id.includes('process')),
+    learning: initialCapsules.filter(c => c.id.includes('learning')),
+    connections: []
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-          Step 4: 任务分解
-        </h2>
-        <p className="text-gray-600 dark:text-slate-400">
-          将年度目标拆解为关键战役和季度行动计划
-        </p>
-      </div>
-
-      {/* Target summary */}
-      {data.step3?.targets && data.step3.targets.length > 0 && (
-        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6 mb-8">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-            已确定的目标
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.step3.targets.map((target, index) => (
-              <div key={index} className="border border-gray-200 dark:border-slate-700 rounded-lg p-4">
-                <div className="font-medium text-gray-900 dark:text-gray-100 mb-1">{target.name}</div>
-                <div className="text-sm text-gray-500 dark:text-slate-400">{target.description}</div>
-                <div className="mt-2 text-sm">
-                  <span className="text-gray-500 dark:text-slate-400">目标:</span>{' '}
-                  <span className="font-semibold text-primary-600 dark:text-primary-400">{target.targetValue}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-          作战地图
-        </h3>
-        <div className="flex gap-3">
+    <div className="w-full min-h-screen bg-background">
+      {/* Top Navigation Bar */}
+      <div className="absolute top-0 left-0 right-0 z-20 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-4">
           <button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="px-6 py-2 bg-primary-500 hover:bg-primary-600 disabled:bg-gray-400
-                       text-white font-medium rounded-lg flex items-center gap-2
-                       transition-all duration-200"
+            onClick={handleBack}
+            className="px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2"
           >
-            {isGenerating ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                生成中...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                生成作战地图
-              </>
-            )}
+            <ArrowLeft className="w-4 h-4" />
+            上一步
           </button>
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300
-                       hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2
-                       transition-all duration-200"
-          >
-            {isEditing ? <Check className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
-            {isEditing ? '完成编辑' : '编辑'}
-          </button>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+            Step 4: BSC 平衡计分卡
+          </h2>
         </div>
-      </div>
 
-      {keyBattles.length === 0 && quarterlyActions.length === 0 ? (
-        <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-12 text-center">
-          <p className="text-gray-500 dark:text-slate-500">点击 "生成作战地图" 开始</p>
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {/* Key Battles */}
-          {keyBattles.length > 0 && (
-            <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
-              <div className="flex items-center gap-2 mb-6">
-                <MapPin className="w-5 h-5 text-primary-500" />
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  关键战役
-                </h4>
-              </div>
-              <div className="space-y-4">
-                {keyBattles.map((battle, index) => (
-                  <div
-                    key={index}
-                    className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 hover:border-primary-300 dark:hover:border-primary-600 transition-colors"
-                  >
-                    {isEditing ? (
-                      <div className="space-y-3">
-                        <input
-                          type="text"
-                          value={battle.name}
-                          onChange={(e) => updateKeyBattle(index, 'name', e.target.value)}
-                          placeholder="战役名称"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg
-                                     bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100
-                                     focus:outline-none focus:ring-2 focus:ring-primary-500 font-medium"
-                        />
-                        <textarea
-                          value={battle.description}
-                          onChange={(e) => updateKeyBattle(index, 'description', e.target.value)}
-                          placeholder="战役描述"
-                          rows={2}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg
-                                     bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100
-                                     focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none text-sm"
-                        />
-                        <input
-                          type="text"
-                          value={battle.owner}
-                          onChange={(e) => updateKeyBattle(index, 'owner', e.target.value)}
-                          placeholder="负责人/部门"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg
-                                     bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100
-                                     focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <h5 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">{battle.name}</h5>
-                        <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">{battle.description}</p>
-                        <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400">
-                          <span>负责人:</span>
-                          <span className="font-medium text-gray-700 dark:text-gray-300">{battle.owner}</span>
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Quarterly Actions */}
-          {quarterlyActions.length > 0 && (
-            <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
-              <div className="flex items-center gap-2 mb-6">
-                <Calendar className="w-5 h-5 text-primary-500" />
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  季度行动计划
-                </h4>
-              </div>
-
-              {isEditing ? (
-                <div className="space-y-3">
-                  {quarterlyActions.map((action, index) => (
-                    <div key={index} className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <select
-                        value={action.quarter}
-                        onChange={(e) => updateQuarterlyAction(index, 'quarter', e.target.value)}
-                        className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg
-                                   bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100
-                                   focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      >
-                        <option value="Q1">Q1</option>
-                        <option value="Q2">Q2</option>
-                        <option value="Q3">Q3</option>
-                        <option value="Q4">Q4</option>
-                      </select>
-                      <input
-                        type="text"
-                        value={action.action}
-                        onChange={(e) => updateQuarterlyAction(index, 'action', e.target.value)}
-                        placeholder="具体行动"
-                        className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg
-                                   bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100
-                                   focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                      <input
-                        type="text"
-                        value={action.deadline}
-                        onChange={(e) => updateQuarterlyAction(index, 'deadline', e.target.value)}
-                        placeholder="截止时间"
-                        className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg
-                                   bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100
-                                   focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {['Q1', 'Q2', 'Q3', 'Q4'].map((quarter) => {
-                    const quarterActions = quarterlyActions.filter(a => a.quarter === quarter);
-                    if (quarterActions.length === 0) return null;
-
-                    return (
-                      <div key={quarter} className="border-l-4 border-primary-500 pl-4">
-                        <h5 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">{quarter}</h5>
-                        <ul className="space-y-2">
-                          {quarterActions.map((action, idx) => (
-                            <li key={idx} className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
-                              <span className="text-primary-500">•</span>
-                              <span className="flex-1">{action.action}</span>
-                              <span className="text-xs text-gray-500 dark:text-slate-500 whitespace-nowrap">
-                                {action.deadline}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="flex justify-between items-center mt-8">
-        <button
-          onClick={handlePrev}
-          className="px-6 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300
-                     hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2
-                     transition-all duration-200"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          上一步
-        </button>
-        <div className="flex gap-4">
+        <div className="flex items-center gap-3">
           <button
             onClick={handleSave}
-            className="px-6 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300
-                       hover:bg-gray-50 dark:hover:bg-slate-700 rounded-lg flex items-center gap-2
-                       transition-all duration-200"
+            className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+              saved
+                ? 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-primary-500 hover:bg-primary-600 text-white'
+            }`}
           >
             <Save className="w-4 h-4" />
-            保存数据
+            {saved ? '已保存' : '保存数据'}
           </button>
+
           <button
             onClick={handleNext}
-            className="px-8 py-2 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg
-                       flex items-center gap-2 transition-all duration-200"
+            className="px-6 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg flex items-center gap-2"
           >
-            生成报告
+            下一步
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </div>
+
+      {/* BSC Board - Takes full screen */}
+      <div className="h-screen pt-20">
+        <BSCBoard
+          initialCapsules={getInitialLanesFromStep3()}
+          step3Data={data.step3 as Step3Data}
+          onSave={async (lanes, connections) => {
+            // Save BSC data to step4
+            await setData('step4', {
+              bscCards: lanes.flatMap(lane => lane.capsules),
+              bscConfirmed: true,
+              actionPlanTable: [],
+              strategyMap: { lanes, connections }
+            });
+            setSaved(true);
+          }}
+        />
+      </div>
+
+      {/* AI Assistant */}
+      <SimpleAIAssistant
+        financial={bscData.financial}
+        customer={bscData.customer}
+        process={bscData.process}
+        learning={bscData.learning}
+        connections={bscData.connections}
+      />
     </div>
   );
 }

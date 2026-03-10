@@ -518,11 +518,9 @@ export default function Step2Insight() {
       const summary = await generateInsightSummary(
         modelConfig.apiKey,
         trends,
-        competitors,
-        companyInfo,
-        customerProfile,
         customerKbf,
-        competitorAdvantages
+        competitorAdvantages,
+        companyInfo
       );
 
       setInsightSummary(summary);
@@ -570,7 +568,8 @@ export default function Step2Insight() {
         st: result.st,
         wt: result.wt
       });
-      setAiStrategicRecommendation(result.strategicRecommendation);
+      // AI recommendation is no longer part of TOWS result
+      setAiStrategicRecommendation('');
       setTowsGenerated(true);
     } catch (error: any) {
       alert(`TOWS 分析失败: ${error.message}`);
@@ -602,8 +601,8 @@ export default function Step2Insight() {
     try {
       const result = await generateProductCustomerMatrix(
         modelConfig.apiKey,
-        towsStrategies,
-        strategicDirection
+        swot,
+        strategicDirection || ''
       );
 
       setProductCustomerMatrix(result);

@@ -43,19 +43,12 @@ export default function SettingsModal() {
       const provider = PROVIDER_OPTIONS.find(p => p.id === localConfig.provider);
       const url = localConfig.provider === 'zhipu'
         ? 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
-        : localConfig.provider === 'openai'
-        ? 'https://api.openai.com/v1/chat/completions'
-        : localConfig.provider === 'deepseek'
-        ? 'https://api.deepseek.com/v1/chat/completions'
         : localConfig.baseUrl || '';
 
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localConfig.apiKey}`,
       };
-
-      if (localConfig.provider !== 'wenxin') {
-        headers['Authorization'] = `Bearer ${localConfig.apiKey}`;
-      }
 
       const response = await fetch(url, {
         method: 'POST',
@@ -131,7 +124,7 @@ export default function SettingsModal() {
               >
                 {PROVIDER_OPTIONS.map((provider) => (
                   <option key={provider.id} value={provider.id}>
-                    {provider.name}
+                    {provider.label}
                   </option>
                 ))}
               </select>
@@ -147,7 +140,7 @@ export default function SettingsModal() {
                   className="text-sm text-primary-500 hover:underline flex items-center gap-1"
                 >
                   <Globe className="w-4 h-4" />
-                  获取 {selectedProvider.name} API Key →
+                  获取 {selectedProvider.label} API Key →
                 </a>
               </div>
             )}

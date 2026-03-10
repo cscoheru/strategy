@@ -14,7 +14,7 @@ import {
   CheckCircle,
   AlertCircle,
   Info,
-  Slider
+  Sparkles
 } from 'lucide-react';
 
 // 客户/产品矩阵数据结构
